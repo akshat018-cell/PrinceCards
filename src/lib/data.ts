@@ -130,9 +130,9 @@ const TAGS = [
   "Best Seller", "Exclusive", "Premium", "Signature",
 ];
 
-const PHYSICAL_PRICES = [15, 28, 9, 45, 22, 55, 8, 35];
-const ECARD_PRICES    = [6, 18, 12, 38, 5, 25, 42, 9];
-const EVIDEO_PRICES   = [20, 65, 35, 12, 75, 28, 55, 18];
+const PHYSICAL_PRICES = [15, 28, 9, 45, 22, 55, 8, 35, 18, 42, 12, 60, 7, 32, 25, 48];
+const ECARD_PRICES    = [6, 18, 12, 38, 5, 25, 42, 9, 15, 30, 8, 22, 45, 11, 27, 36];
+const EVIDEO_PRICES   = [20, 65, 35, 12, 75, 28, 55, 18, 40, 80, 22, 50, 30, 68, 15, 45];
 
 function makeCards(count: number, tab: TabType, titles: string[], prices: number[]): CardItem[] {
   return Array.from({ length: count }, (_, i) => {
@@ -148,9 +148,9 @@ function makeCards(count: number, tab: TabType, titles: string[], prices: number
   });
 }
 
-const physicalCards = makeCards(8, "physical", physicalTitles, PHYSICAL_PRICES);
-const eCards        = makeCards(8, "ecard",    ecardTitles,    ECARD_PRICES);
-const eVideos       = makeCards(8, "evideo",   evideoTitles,   EVIDEO_PRICES);
+const physicalCards = makeCards(100, "physical", physicalTitles, PHYSICAL_PRICES);
+const eCards        = makeCards(100, "ecard",    ecardTitles,    ECARD_PRICES);
+const eVideos       = makeCards(100, "evideo",   evideoTitles,   EVIDEO_PRICES);
 
 export const ALL_CARDS: CardItem[] = [...physicalCards, ...eCards, ...eVideos];
 

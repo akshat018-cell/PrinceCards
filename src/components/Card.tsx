@@ -37,13 +37,7 @@ export default function Card({ item, onClick }: CardProps) {
       <div
         className="relative w-full overflow-hidden"
         style={{
-          // Physical: 1:1 square | E-Card: 9:16 portrait | E-Video: 16:9 landscape
-          aspectRatio:
-            item.tab === "physical"
-              ? "1 / 1"
-              : item.tab === "ecard"
-              ? "9 / 16"
-              : "16 / 9",
+          aspectRatio: "4 / 3",
           backgroundColor: "var(--color-tag-bg)",
         }}
       >
@@ -52,7 +46,7 @@ export default function Card({ item, onClick }: CardProps) {
           alt={item.title}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          sizes="(max-width: 768px) 50vw, 25vw"
         />
 
         {/* E-Card dots overlay */}
@@ -109,7 +103,7 @@ export default function Card({ item, onClick }: CardProps) {
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-4">
+      <div className="flex flex-col flex-1 p-3">
         {/* Tag pill */}
         <span
           className="mb-2 inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
@@ -141,11 +135,7 @@ export default function Card({ item, onClick }: CardProps) {
             ₹{item.price}
           </span>
           <span
-            className="text-xs px-2.5 py-1 rounded-full font-medium transition-all duration-200 group-hover:bg-[var(--color-accent)] group-hover:text-white"
-            style={{
-              border: "1px solid var(--color-accent)",
-              color: "var(--color-accent-dark)",
-            }}
+            className="text-xs px-2.5 py-1 rounded-full font-medium border border-[#D4AF37] text-[#D4AF37] bg-transparent group-hover:bg-[#D4AF37] group-hover:text-white transition-all duration-300"
           >
             View
           </span>

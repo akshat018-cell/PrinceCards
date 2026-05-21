@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Grid from "@/components/Grid";
 import Modal from "@/components/Modal";
@@ -211,11 +211,26 @@ export default function Home() {
   const [priceFilter, setPriceFilter] = useState<PriceRange>("all");
   const [selectedCard, setSelectedCard] = useState<CardItem | null>(null);
   const [filterOpen, setFilterOpen]   = useState(false);
+  const [menuOpen, setMenuOpen]        = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const handleNavigate = useCallback((view: ViewType) => {
     setActiveView(view);
     setPriceFilter("all");
     setFilterOpen(false);
+    setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
@@ -235,22 +250,70 @@ export default function Home() {
     <div style={{ backgroundColor: "var(--color-bg)" }}>
 
       {/* ══ FIXED TOP BAR ═════════════════════════════════ */}
-      <header className="fixed top-0 left-0 right-0 z-40 h-[68px]"
-        style={{ borderBottom: "1px solid var(--color-card-border)", backgroundColor: "rgba(252,251,249,0.88)", backdropFilter: "blur(16px)" }}>
-        <div className="relative mx-auto max-w-screen-xl h-full flex items-center px-5 md:px-8">
+      <header ref={menuRef} className="fixed top-0 left-0 right-0 z-40"
+        style={{ borderBottom: menuOpen ? "none" : "1px solid var(--color-card-border)", backgroundColor: "rgba(252,251,249,0.88)", backdropFilter: "blur(16px)" }}>
 
-          {/* ── Logo – top left ── */}
-          <button onClick={() => handleNavigate("home")}
-            className="absolute left-5 md:left-8 flex-shrink-0 transition-opacity duration-200 hover:opacity-80"
-            aria-label="PrinceCards Home">
-            <span className="gold-shimmer text-xl md:text-2xl font-bold"
+        {/* ── Main bar row (68px tall) ── */}
+        <div className="relative mx-auto max-w-screen-xl h-[68px] flex items-center px-5 md:px-8">
+
+          {/* ━━ MOBILE layout: hamburger | logo | cart (flex, 3 zones) ━━ */}
+
+          {/* Left: Hamburger (mobile only) */}
+          <button
+            id="mobile-menu-toggle"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150 flex-shrink-0"
+            style={{ color: "#2D2B2A" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-tag-bg)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            {menuOpen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="#2D2B2A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="#2D2B2A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6"  x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
+          </button>
+
+          {/* Center: Logo — absolute center on mobile, absolute left on desktop */}
+          <button
+            onClick={() => handleNavigate("home")}
+            aria-label="PrinceCards Home"
+            className="
+              md:hidden
+              absolute left-1/2 -translate-x-1/2
+              flex-shrink-0 transition-opacity duration-200 hover:opacity-80
+            "
+          >
+            <span className="gold-shimmer text-xl font-bold"
               style={{ fontFamily: "var(--font-playfair), serif" }}>
               PrinceCards
             </span>
           </button>
 
-          {/* ── Floating Navbar – center ── */}
-          <nav className="absolute left-1/2 -translate-x-1/2" aria-label="Main navigation">
+          {/* Logo — desktop: absolute left */}
+          <button
+            onClick={() => handleNavigate("home")}
+            aria-label="PrinceCards Home"
+            className="hidden md:block absolute left-8 flex-shrink-0 transition-opacity duration-200 hover:opacity-80"
+          >
+            <span className="gold-shimmer text-2xl font-bold"
+              style={{ fontFamily: "var(--font-playfair), serif" }}>
+              PrinceCards
+            </span>
+          </button>
+
+          {/* ── Desktop floating navbar – center (md and up) ── */}
+          <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block" aria-label="Main navigation">
             <div className="floating-nav flex items-center gap-1 px-2 py-2">
               {NAV_LINKS.map((link) => (
                 <button
@@ -267,15 +330,87 @@ export default function Home() {
             </div>
           </nav>
 
-          {/* ── Right slot (contact CTA) ── */}
-          <div className="absolute right-5 md:right-8 hidden sm:block">
+          {/* Right: Cart icon (mobile) / Get a Quote (desktop) */}
+          <div className="ml-auto flex items-center">
+            {/* Cart — mobile only */}
+            <button
+              id="mobile-cart-btn"
+              aria-label="Shopping cart"
+              className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-150"
+              style={{ color: "#2D2B2A" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-tag-bg)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="#2D2B2A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+            </button>
+
+            {/* Get a Quote — desktop only */}
             <button
               onClick={() => handleNavigate("matter")}
-              className="px-4 py-2 rounded-full text-xs font-semibold tracking-wide uppercase transition-all duration-200 hover:scale-105"
+              className="hidden md:block px-4 py-2 rounded-full text-xs font-semibold tracking-wide uppercase transition-all duration-200 hover:scale-105"
               style={{ background: "linear-gradient(135deg, var(--color-accent), var(--color-accent-dark))", color: "white" }}>
               Get a Quote
             </button>
           </div>
+        </div>
+
+        {/* ── Mobile dropdown menu ── */}
+        <div
+          id="mobile-menu"
+          aria-hidden={!menuOpen}
+          className="mobile-menu-dropdown md:hidden"
+          style={{
+            maxHeight: menuOpen ? "320px" : "0px",
+            opacity:   menuOpen ? 1 : 0,
+            overflow:  "hidden",
+            transition: "max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease",
+            borderTop: menuOpen ? "1px solid var(--color-card-border)" : "none",
+            borderBottom: menuOpen ? "1px solid var(--color-card-border)" : "none",
+            backgroundColor: "#FCFBF9",
+            boxShadow: menuOpen ? "0 8px 32px rgba(45,43,42,0.12)" : "none",
+          }}
+        >
+          <nav aria-label="Mobile navigation">
+            <ul className="flex flex-col py-2">
+              {NAV_LINKS.map((link) => {
+                const isActive = activeView === link.id;
+                return (
+                  <li key={link.id}>
+                    <button
+                      id={`mobile-nav-${link.id}`}
+                      onClick={() => handleNavigate(link.id)}
+                      aria-current={isActive ? "page" : undefined}
+                      className="w-full text-left px-6 py-3.5 text-base font-semibold transition-colors duration-150"
+                      style={{
+                        color: isActive ? "var(--color-accent)" : "var(--color-text)",
+                        backgroundColor: isActive ? "var(--color-tag-bg)" : "transparent",
+                        borderLeft: isActive ? "3px solid var(--color-accent)" : "3px solid transparent",
+                      }}
+                      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "var(--color-tag-bg)"; }}
+                      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                );
+              })}
+              {/* Get a Quote row */}
+              <li className="px-6 pt-2 pb-3">
+                <button
+                  onClick={() => handleNavigate("matter")}
+                  className="w-full py-3 rounded-xl text-sm font-semibold tracking-wide uppercase transition-all duration-200"
+                  style={{ background: "linear-gradient(135deg, var(--color-accent), var(--color-accent-dark))", color: "white" }}
+                >
+                  Get a Quote
+                </button>
+              </li>
+            </ul>
+          </nav>
         </div>
       </header>
 
@@ -291,29 +426,14 @@ export default function Home() {
         {/* ── Product Views (Wedding Cards / E-Card / E-Video) ── */}
         {isProductView(activeView) && (
           <>
-            {/* Sub-header toolbar */}
-            <div className="toolbar-blur sticky top-[68px] z-30 border-b px-4 md:px-8"
-              style={{ borderColor: "var(--color-card-border)" }}>
-              <div className="mx-auto max-w-screen-xl flex items-center justify-between">
-                {/* Tab pills */}
-                <div className="flex items-center gap-0" role="tablist" aria-label="Product category tabs">
-                  {TABS.map((tab) => {
-                    const isActive = activeView === tab.id;
-                    return (
-                      <button key={tab.id} id={`tab-${tab.id}`} role="tab"
-                        aria-selected={isActive}
-                        onClick={() => { setActiveView(tab.id); setPriceFilter("all"); }}
-                        className="relative px-4 py-4 text-sm font-semibold transition-colors duration-200"
-                        style={{ color: isActive ? "var(--color-accent-dark)" : "var(--color-muted)" }}>
-                        {tab.label}
-                        <span className="absolute bottom-0 left-0 h-0.5 w-full transition-all duration-300"
-                          style={{ backgroundColor: "var(--color-accent)", transform: isActive ? "scaleX(1)" : "scaleX(0)", transformOrigin: "center" }} />
-                      </button>
-                    );
-                  })}
-                </div>
+            {/* Grid section */}
+            <section
+              className="mx-auto max-w-screen-xl px-4 md:px-8 py-10"
+              onClick={() => filterOpen && setFilterOpen(false)}
+              aria-label={`${tabLabel} collection`}>
 
-                {/* Filter dropdown */}
+              {/* Filter button – far right, aligned with grid top */}
+              <div className="flex items-center justify-end mb-7">
                 <div className="relative" id="filter-container">
                   <button id="filter-btn"
                     onClick={() => setFilterOpen((p) => !p)}
@@ -358,29 +478,7 @@ export default function Home() {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Grid section */}
-            <section
-              className="mx-auto max-w-screen-xl px-4 md:px-8 py-10"
-              onClick={() => filterOpen && setFilterOpen(false)}
-              aria-label={`${tabLabel} collection`}>
-              <div className="flex items-center justify-between mb-7">
-                <div>
-                  <p className="text-xs uppercase tracking-widest font-semibold mb-1" style={{ color: "var(--color-accent)" }}>
-                    {tabLabel}
-                  </p>
-                  <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-                    {filteredItems.length} design{filteredItems.length !== 1 ? "s" : ""} available
-                  </p>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 text-xs" style={{ color: "var(--color-muted)" }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="var(--color-accent)" opacity="0.8">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                  Click any card to view details &amp; gallery
-                </div>
-              </div>
               <Grid items={filteredItems} onCardClick={setSelectedCard} />
             </section>
           </>

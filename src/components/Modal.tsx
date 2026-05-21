@@ -21,9 +21,18 @@ export default function Modal({ item, onClose }: ModalProps) {
   const [currentIdx, setCurrentIdx]      = useState(0);
   const [slideDir, setSlideDir]          = useState<"left" | "right">("left");
   const [animKey, setAnimKey]            = useState(0);
+  const [isUsingMatter, setIsUsingMatter] = useState(false);
 
-  // Reset gallery index when item changes
-  useEffect(() => { setCurrentIdx(0); }, [item]);
+  // Mock saved matter data
+  const mockMatter = {
+    bride: "Sneha",
+    groom: "Rahul",
+    date: "December 12th, 2026",
+    venue: "Brilliant Convention Centre, Indore",
+  };
+
+  // Reset gallery index + matter overlay when item changes
+  useEffect(() => { setCurrentIdx(0); setIsUsingMatter(false); }, [item]);
 
   // Scroll lock
   useEffect(() => {
@@ -117,6 +126,45 @@ export default function Modal({ item, onClose }: ModalProps) {
                 />
               </div>
 
+              {/* ── Live Canvas Matter Overlay ── */}
+              {isUsingMatter && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm bg-white/40">
+                  {/* Ornament top */}
+                  <div className="flex items-center gap-3 mb-5" aria-hidden="true">
+                    <div className="h-px w-10" style={{ background: "linear-gradient(90deg, transparent, #D4AF37)" }} />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="#D4AF37">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    <div className="h-px w-10" style={{ background: "linear-gradient(90deg, #D4AF37, transparent)" }} />
+                  </div>
+
+                  {/* Names */}
+                  <p
+                    className="text-4xl italic leading-tight tracking-wide text-[#2D2B2A]"
+                    style={{ fontFamily: "var(--font-serif)" }}
+                  >
+                    {mockMatter.bride}
+                    <span className="mx-3 not-italic text-[#D4AF37]">&amp;</span>
+                    {mockMatter.groom}
+                  </p>
+
+                  {/* Divider */}
+                  <div className="my-4 flex items-center gap-3" aria-hidden="true">
+                    <div className="h-px w-8" style={{ background: "rgba(45,43,42,0.25)" }} />
+                    <span className="text-xs tracking-[0.25em] uppercase text-[#2D2B2A]/60 font-semibold">Invite</span>
+                    <div className="h-px w-8" style={{ background: "rgba(45,43,42,0.25)" }} />
+                  </div>
+
+                  {/* Date & Venue */}
+                  <p className="text-sm font-semibold text-[#2D2B2A] tracking-wide">
+                    {mockMatter.date}
+                  </p>
+                  <p className="mt-1 text-xs text-[#2D2B2A]/70 leading-snug max-w-[200px]">
+                    {mockMatter.venue}
+                  </p>
+                </div>
+              )}
+
               {/* Video play overlay */}
               {isVideo && currentIdx === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center z-10">
@@ -141,11 +189,11 @@ export default function Modal({ item, onClose }: ModalProps) {
               <button
                 onClick={() => navigate("prev")}
                 aria-label="Previous image"
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg"
-                style={{ backgroundColor: "rgba(255,255,255,0.85)", color: "var(--color-text)" }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)" }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                  stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -154,11 +202,11 @@ export default function Modal({ item, onClose }: ModalProps) {
               <button
                 onClick={() => navigate("next")}
                 aria-label="Next image"
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 hover:scale-110 hover:shadow-lg"
-                style={{ backgroundColor: "rgba(255,255,255,0.85)", color: "var(--color-text)" }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)" }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                  stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -257,19 +305,25 @@ export default function Modal({ item, onClose }: ModalProps) {
 
             {/* CTA buttons */}
             <div className="mt-auto flex flex-col sm:flex-row gap-3">
-              <button id="modal-enquire-btn"
+              <button id="modal-add-to-cart-btn"
                 className="flex-1 rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
                 style={{ backgroundColor: "var(--color-accent)", color: "white" }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent-dark)")}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent)")}>
-                Enquire Now
+                Add to Cart
               </button>
-              <button id="modal-sample-btn"
+              {/* Use Matter / Clear Matter toggle */}
+              <button
+                id="modal-use-matter-btn"
+                onClick={() => setIsUsingMatter((v) => !v)}
                 className="flex-1 rounded-xl border py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02]"
-                style={{ borderColor: "var(--color-accent)", color: "var(--color-accent-dark)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-tag-bg)")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
-                Request Sample
+                style={{
+                  borderColor: "var(--color-accent)",
+                  color: isUsingMatter ? "var(--color-accent-dark)" : "var(--color-accent-dark)",
+                  backgroundColor: isUsingMatter ? "var(--color-tag-bg)" : "transparent",
+                }}
+              >
+                {isUsingMatter ? "Clear Matter" : "Use Matter"}
               </button>
             </div>
           </div>
