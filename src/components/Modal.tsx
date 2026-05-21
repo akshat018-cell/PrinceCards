@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
+import { FaWhatsapp } from "react-icons/fa";
 import type { CardItem, TabType } from "@/lib/data";
 import { GALLERY_IMAGES } from "@/lib/data";
+import { useMatter } from "@/context/MatterContext";
 
 interface ModalProps {
-  item: CardItem | null;
-  onClose: () => void;
+  item:     CardItem | null;
+  onClose:  () => void;
+  onNavigateToMatter: () => void;   // closes modal + goes to Matter tab
 }
 
 const TAB_LABEL: Record<TabType, string> = {
@@ -16,23 +19,16 @@ const TAB_LABEL: Record<TabType, string> = {
   evideo:   "E-Video",
 };
 
-export default function Modal({ item, onClose }: ModalProps) {
-  const overlayRef                       = useRef<HTMLDivElement>(null);
-  const [currentIdx, setCurrentIdx]      = useState(0);
-  const [slideDir, setSlideDir]          = useState<"left" | "right">("left");
-  const [animKey, setAnimKey]            = useState(0);
-  const [isUsingMatter, setIsUsingMatter] = useState(false);
+export default function Modal({ item, onClose, onNavigateToMatter }: ModalProps) {
+  const overlayRef                  = useRef<HTMLDivElement>(null);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [slideDir, setSlideDir]     = useState<"left" | "right">("left");
+  const [animKey, setAnimKey]       = useState(0);
 
-  // Mock saved matter data
-  const mockMatter = {
-    bride: "Sneha",
-    groom: "Rahul",
-    date: "December 12th, 2026",
-    venue: "Brilliant Convention Centre, Indore",
-  };
+  const { savedMatter, isMatterDownloaded } = useMatter();
 
-  // Reset gallery index + matter overlay when item changes
-  useEffect(() => { setCurrentIdx(0); setIsUsingMatter(false); }, [item]);
+  // Reset gallery index when item changes
+  useEffect(() => { setCurrentIdx(0); }, [item]);
 
   // Scroll lock
   useEffect(() => {
@@ -59,7 +55,7 @@ export default function Modal({ item, onClose }: ModalProps) {
     );
   }, [item]);
 
-  // Keyboard arrow navigation inside modal
+  // Keyboard arrow navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!item) return;
@@ -72,9 +68,23 @@ export default function Modal({ item, onClose }: ModalProps) {
 
   if (!item) return null;
 
-  const images    = GALLERY_IMAGES[item.tab];
-  const current   = images[currentIdx];
-  const isVideo   = item.tab === "evideo";
+  // ── WhatsApp Enquire Now (only visible after PDF downloaded) ──
+  const handleEnquireNow = () => {
+    const productLink = typeof window !== "undefined" ? window.location.href : "https://princecards.in";
+    const matter = savedMatter;
+    const message =
+      `Hello PrinceCards! I want to order this card: ${productLink}\n` +
+      `Product: *${item.title}*\n` +
+      `Price: ₹${item.price}/piece\n\n` +
+      `My Matter details are summarized below, and I will attach the PDF file to this chat:\n` +
+      `👰 Bride: ${matter?.bride ?? ""} | 🤵 Groom: ${matter?.groom ?? ""} | 📅 Date: ${matter?.date ?? ""}`;
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/919826015250?text=${encoded}`, "_blank", "noopener,noreferrer");
+  };
+
+  const images     = GALLERY_IMAGES[item.tab];
+  const current    = images[currentIdx];
+  const isVideo    = item.tab === "evideo";
   const slideClass = slideDir === "left" ? "gallery-slide-left" : "gallery-slide-right";
 
   return (
@@ -113,57 +123,17 @@ export default function Modal({ item, onClose }: ModalProps) {
           <div className="relative flex-shrink-0 w-full md:w-[48%] flex flex-col"
             style={{ backgroundColor: "var(--color-tag-bg)", borderRadius: "16px 0 0 16px" }}>
 
-            {/* Main image with slide animation */}
+            {/* Main image */}
             <div className="relative flex-1 min-h-[300px] md:min-h-[480px] overflow-hidden rounded-tl-2xl md:rounded-bl-2xl rounded-tr-2xl md:rounded-tr-none">
               <div key={animKey} className={`${slideClass} absolute inset-0`}>
                 <Image
                   src={current.src}
                   alt={`${item.title} – ${current.label}`}
-                  fill
-                  className="object-cover"
+                  fill className="object-cover"
                   sizes="(max-width: 768px) 100vw, 48vw"
                   priority
                 />
               </div>
-
-              {/* ── Live Canvas Matter Overlay ── */}
-              {isUsingMatter && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm bg-white/40">
-                  {/* Ornament top */}
-                  <div className="flex items-center gap-3 mb-5" aria-hidden="true">
-                    <div className="h-px w-10" style={{ background: "linear-gradient(90deg, transparent, #D4AF37)" }} />
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="#D4AF37">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    <div className="h-px w-10" style={{ background: "linear-gradient(90deg, #D4AF37, transparent)" }} />
-                  </div>
-
-                  {/* Names */}
-                  <p
-                    className="text-4xl italic leading-tight tracking-wide text-[#2D2B2A]"
-                    style={{ fontFamily: "var(--font-serif)" }}
-                  >
-                    {mockMatter.bride}
-                    <span className="mx-3 not-italic text-[#D4AF37]">&amp;</span>
-                    {mockMatter.groom}
-                  </p>
-
-                  {/* Divider */}
-                  <div className="my-4 flex items-center gap-3" aria-hidden="true">
-                    <div className="h-px w-8" style={{ background: "rgba(45,43,42,0.25)" }} />
-                    <span className="text-xs tracking-[0.25em] uppercase text-[#2D2B2A]/60 font-semibold">Invite</span>
-                    <div className="h-px w-8" style={{ background: "rgba(45,43,42,0.25)" }} />
-                  </div>
-
-                  {/* Date & Venue */}
-                  <p className="text-sm font-semibold text-[#2D2B2A] tracking-wide">
-                    {mockMatter.date}
-                  </p>
-                  <p className="mt-1 text-xs text-[#2D2B2A]/70 leading-snug max-w-[200px]">
-                    {mockMatter.venue}
-                  </p>
-                </div>
-              )}
 
               {/* Video play overlay */}
               {isVideo && currentIdx === 0 && (
@@ -185,26 +155,20 @@ export default function Modal({ item, onClose }: ModalProps) {
                 </div>
               )}
 
-              {/* ── Left nav arrow ── */}
-              <button
-                onClick={() => navigate("prev")}
-                aria-label="Previous image"
+              {/* Left arrow */}
+              <button onClick={() => navigate("prev")} aria-label="Previous image"
                 className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
-                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)" }}
-              >
+                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18)" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                   stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
 
-              {/* ── Right nav arrow ── */}
-              <button
-                onClick={() => navigate("next")}
-                aria-label="Next image"
+              {/* Right arrow */}
+              <button onClick={() => navigate("next")} aria-label="Next image"
                 className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
-                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10)" }}
-              >
+                style={{ backgroundColor: "#ffffff", boxShadow: "0 4px 16px rgba(0,0,0,0.18)" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                   stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
@@ -212,36 +176,25 @@ export default function Modal({ item, onClose }: ModalProps) {
               </button>
             </div>
 
-            {/* ── Thumbnail strip ── */}
+            {/* Thumbnails */}
             <div className="flex items-center justify-center gap-2 p-3">
               {images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setSlideDir(i > currentIdx ? "left" : "right");
-                    setAnimKey((k) => k + 1);
-                    setCurrentIdx(i);
-                  }}
+                <button key={i}
+                  onClick={() => { setSlideDir(i > currentIdx ? "left" : "right"); setAnimKey((k) => k + 1); setCurrentIdx(i); }}
                   aria-label={`View ${img.label}`}
                   className="relative flex-shrink-0 overflow-hidden transition-all duration-200"
                   style={{
-                    width: 52, height: 42,
-                    borderRadius: 8,
-                    border: i === currentIdx
-                      ? "2px solid var(--color-accent)"
-                      : "2px solid transparent",
+                    width: 52, height: 42, borderRadius: 8,
+                    border: i === currentIdx ? "2px solid var(--color-accent)" : "2px solid transparent",
                     opacity: i === currentIdx ? 1 : 0.55,
                     transform: i === currentIdx ? "scale(1.08)" : "scale(1)",
-                  }}
-                >
+                  }}>
                   <Image src={img.src} alt={img.label} fill className="object-cover" sizes="52px" />
                 </button>
               ))}
             </div>
 
-            {/* Image label */}
-            <p className="pb-3 text-center text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--color-muted)" }}>
+            <p className="pb-3 text-center text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>
               {currentIdx + 1} / {images.length} — {current.label}
             </p>
           </div>
@@ -274,20 +227,8 @@ export default function Modal({ item, onClose }: ModalProps) {
             {/* Divider */}
             <div className="mb-5 h-px" style={{ background: "linear-gradient(90deg, var(--color-card-border), transparent)" }} />
 
-            {/* Details */}
-            <div className="mb-5 rounded-xl p-4" style={{ backgroundColor: "var(--color-tag-bg)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-accent-dark)" }}>
-                Product Details
-              </p>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--color-muted)" }}>
-                Experience the finest craftsmanship in Indian wedding stationery. Each piece is
-                thoughtfully designed to capture the essence of celebration, tradition, and love —
-                crafted to make your special day truly unforgettable.
-              </p>
-            </div>
-
             {/* Spec list */}
-            <ul className="mb-7 space-y-2.5">
+            <ul className="mb-6 space-y-2.5">
               {[
                 ["Format",        item.tab === "physical" ? "Premium Print" : item.tab === "ecard" ? "Digital E-Card" : "Video File (MP4)"],
                 ["Customization", "Name, Date, Venue & Matter"],
@@ -295,36 +236,98 @@ export default function Modal({ item, onClose }: ModalProps) {
                 ["Min. Order",    "50 pieces"],
               ].map(([label, value]) => (
                 <li key={label} className="flex items-start gap-3 text-sm">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: "var(--color-accent)" }} />
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: "var(--color-accent)" }} />
                   <span style={{ color: "var(--color-muted)" }}>{label}:</span>
                   <span className="font-medium" style={{ color: "var(--color-text)" }}>{value}</span>
                 </li>
               ))}
             </ul>
 
-            {/* CTA buttons */}
-            <div className="mt-auto flex flex-col sm:flex-row gap-3">
-              <button id="modal-add-to-cart-btn"
-                className="flex-1 rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-                style={{ backgroundColor: "var(--color-accent)", color: "white" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent-dark)")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent)")}>
-                Add to Cart
-              </button>
-              {/* Use Matter / Clear Matter toggle */}
-              <button
-                id="modal-use-matter-btn"
-                onClick={() => setIsUsingMatter((v) => !v)}
-                className="flex-1 rounded-xl border py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02]"
-                style={{
-                  borderColor: "var(--color-accent)",
-                  color: isUsingMatter ? "var(--color-accent-dark)" : "var(--color-accent-dark)",
-                  backgroundColor: isUsingMatter ? "var(--color-tag-bg)" : "transparent",
-                }}
-              >
-                {isUsingMatter ? "Clear Matter" : "Use Matter"}
-              </button>
+            {/* ══ CONDITIONAL CTA AREA ══ */}
+            <div className="mt-auto">
+
+              {/* ── STATE A: Matter NOT yet downloaded ── */}
+              {!isMatterDownloaded && (
+                <>
+                  {/* Nudge card */}
+                  <div className="mb-4 rounded-xl p-4 flex items-start gap-3"
+                    style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A" }}>
+                    <span className="text-lg flex-shrink-0 mt-0.5">💡</span>
+                    <div>
+                      <p className="text-xs font-bold mb-0.5" style={{ color: "#92400E" }}>Complete Your Matter First</p>
+                      <p className="text-xs leading-relaxed" style={{ color: "#78350F" }}>
+                        Head to the <strong>Matter</strong> tab, fill in your details, and download your PDF — then come back to enquire about this design.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3">
+                    <button id="modal-wishlist-btn"
+                      className="flex-1 rounded-xl border py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02]"
+                      style={{ borderColor: "var(--color-accent)", color: "var(--color-accent-dark)", backgroundColor: "transparent" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-tag-bg)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
+                      ♡ Add to Wishlist
+                    </button>
+                    <button id="modal-create-matter-btn"
+                      onClick={() => { onClose(); onNavigateToMatter(); }}
+                      className="flex-1 rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+                      style={{ backgroundColor: "var(--color-accent)", color: "white" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent-dark)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent)")}>
+                      ✦ Create Matter
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ── STATE B: Matter IS downloaded ── */}
+              {isMatterDownloaded && savedMatter && (
+                <>
+                  {/* Saved matter summary */}
+                  <div className="mb-4 rounded-xl p-4"
+                    style={{ backgroundColor: "var(--color-tag-bg)", border: "1px solid var(--color-card-border)" }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-accent-dark)" }}>
+                      ✓ Your Saved Matter
+                    </p>
+                    <div className="grid grid-cols-2 gap-y-2 text-xs">
+                      {[
+                        ["👰 Bride",  savedMatter.bride],
+                        ["🤵 Groom",  savedMatter.groom],
+                        ["📅 Date",   savedMatter.date],
+                        ["📍 Venue",  savedMatter.venue],
+                      ].map(([label, value]) => (
+                        <div key={label} className="col-span-2 flex gap-2">
+                          <span style={{ color: "var(--color-muted)", minWidth: 60 }}>{label}</span>
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3">
+                    <button id="modal-wishlist-btn-b"
+                      className="flex-1 rounded-xl border py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02]"
+                      style={{ borderColor: "var(--color-accent)", color: "var(--color-accent-dark)", backgroundColor: "transparent" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-tag-bg)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
+                      ♡ Add to Wishlist
+                    </button>
+                    <button id="modal-enquire-now-btn"
+                      onClick={handleEnquireNow}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+                      style={{ backgroundColor: "#25D366", color: "white" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1EAD52")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#25D366")}>
+                      <FaWhatsapp size={16} />
+                      Enquire Now
+                    </button>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
         </div>
