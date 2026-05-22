@@ -138,7 +138,9 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
   );
 }
 
+// 5 steps: Events, Details, Vibe, Family, Review
 const STEP_LABELS = ["Events", "Details", "Vibe", "Family", "Review"];
+const TOTAL_STEPS = 5;
 
 // ─────────────────────────────────────────────────────────────
 // Step 1 — Event selection
@@ -287,7 +289,6 @@ function CustomTimePicker({ value, onChange, id }: {
     cursor:        "pointer",
     appearance:    "none" as const,
     textAlign:     "center" as const,
-    // Remove default arrow; we rely on the text being short enough
     backgroundImage: "none",
   };
 
@@ -408,7 +409,6 @@ function Step2Details({
     </div>
   );
 }
-
 
 // ─────────────────────────────────────────────────────────────
 // Step 3 — The Vibe
@@ -554,26 +554,96 @@ function FamilyColumn({
 }
 
 function Step4Family({
+  brideName, groomName,
+  onBrideNameChange, onGroomNameChange,
   brideFamily, groomFamily,
   onBrideAdd, onBrideUpdate, onBrideRemove,
   onGroomAdd, onGroomUpdate, onGroomRemove,
 }: {
-  brideFamily:    FamilyMember[];
-  groomFamily:    FamilyMember[];
-  onBrideAdd:     () => void;
-  onBrideUpdate:  (id: string, field: keyof Omit<FamilyMember, "id">, val: string) => void;
-  onBrideRemove:  (id: string) => void;
-  onGroomAdd:     () => void;
-  onGroomUpdate:  (id: string, field: keyof Omit<FamilyMember, "id">, val: string) => void;
-  onGroomRemove:  (id: string) => void;
+  brideName:          string;
+  groomName:          string;
+  onBrideNameChange:  (v: string) => void;
+  onGroomNameChange:  (v: string) => void;
+  brideFamily:        FamilyMember[];
+  groomFamily:        FamilyMember[];
+  onBrideAdd:         () => void;
+  onBrideUpdate:      (id: string, field: keyof Omit<FamilyMember, "id">, val: string) => void;
+  onBrideRemove:      (id: string) => void;
+  onGroomAdd:         () => void;
+  onGroomUpdate:      (id: string, field: keyof Omit<FamilyMember, "id">, val: string) => void;
+  onGroomRemove:      (id: string) => void;
 }) {
+  /** Shared inline-focus handler for couple name inputs */
+  const goldFocus   = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "#D4AF37";
+    e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(212,175,55,0.18)";
+  };
+  const goldBlur    = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "var(--color-card-border)";
+    e.currentTarget.style.boxShadow   = "none";
+  };
+
   return (
     <div>
       <h3 className="text-lg font-bold mb-1" style={{ fontFamily: "var(--font-playfair), serif" }}>
-        Family Names
+        The Couple &amp; Family
       </h3>
       <p className="text-sm mb-6" style={{ color: "var(--color-muted)" }}>
-        Add family members from both sides. Their names will appear on the invitation pages you choose.
+        Enter the couple&apos;s names and add family members from both sides.
+      </p>
+
+      {/* ── The Couple ─────────────────────────────── */}
+      <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--color-accent-dark)" }}>
+        <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: "var(--color-accent)" }} />
+        The Couple
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+            style={{ color: "var(--color-muted)" }}>Bride&apos;s Full Name</label>
+          <input
+            type="text"
+            placeholder="e.g. Priya Sharma"
+            value={brideName}
+            onChange={(e) => onBrideNameChange(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200"
+            style={{
+              border:          "1.5px solid var(--color-card-border)",
+              backgroundColor: "#FCFBF9",
+              color:           "#2D2B2A",
+              fontFamily:      "inherit",
+            }}
+            onFocus={goldFocus}
+            onBlur={goldBlur}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+            style={{ color: "var(--color-muted)" }}>Groom&apos;s Full Name</label>
+          <input
+            type="text"
+            placeholder="e.g. Rahul Mehta"
+            value={groomName}
+            onChange={(e) => onGroomNameChange(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200"
+            style={{
+              border:          "1.5px solid var(--color-card-border)",
+              backgroundColor: "#FCFBF9",
+              color:           "#2D2B2A",
+              fontFamily:      "inherit",
+            }}
+            onFocus={goldFocus}
+            onBlur={goldBlur}
+          />
+        </div>
+      </div>
+
+      <hr style={{ border: "none", borderTop: "1px solid var(--color-card-border)", marginBottom: "1.5rem" }} />
+
+      {/* ── Family Members ─────────────────────────── */}
+      <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: "var(--color-accent-dark)" }}>
+        <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: "var(--color-accent)" }} />
+        Family Members
       </p>
       <div className="flex flex-col sm:flex-row gap-5">
         <FamilyColumn title="Bride's Side" members={brideFamily}
@@ -770,7 +840,7 @@ function CompletedState({ onReset }: { onReset: () => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PDF Generation
+// PDF Generation — English only, default helvetica font
 // ─────────────────────────────────────────────────────────────
 async function generateMultiPagePDF(
   matter: SavedMatter,
@@ -781,23 +851,19 @@ async function generateMultiPagePDF(
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   const W = 210, H = 297;
-  const GOLD = [212, 175, 55] as [number, number, number];
-  const GOLD_D = [184, 150, 30] as [number, number, number];
-  const ESPRESSO = [45, 43, 42] as [number, number, number];
-  const MUTED = [138, 127, 116] as [number, number, number];
-  const BG = [252, 251, 249] as [number, number, number];
+  const GOLD    = [212, 175, 55]  as [number, number, number];
+  const GOLD_D  = [184, 150, 30]  as [number, number, number];
+  const ESPRESSO = [45, 43, 42]   as [number, number, number];
+  const MUTED   = [138, 127, 116] as [number, number, number];
+  const BG      = [252, 251, 249] as [number, number, number];
 
-  const bride = matter.brideFamily.find((m) => m.relationship === "Parent" && m.placement === "Cover Page")?.name
-    ?? matter.brideFamily.find((m) => m.placement === "Cover Page")?.name
-    ?? "The Bride";
-  const groom = matter.groomFamily.find((m) => m.relationship === "Parent" && m.placement === "Cover Page")?.name
-    ?? matter.groomFamily.find((m) => m.placement === "Cover Page")?.name
-    ?? "The Groom";
+  const bride = matter.bride || "The Bride";
+  const groom = matter.groom || "The Groom";
 
-  // Helper functions
+  // ── Helper functions ──────────────────────────────────────
   function setColor(rgb: [number, number, number]) { doc.setTextColor(rgb[0], rgb[1], rgb[2]); }
-  function setFill(rgb: [number, number, number]) { doc.setFillColor(rgb[0], rgb[1], rgb[2]); }
-  function setDraw(rgb: [number, number, number]) { doc.setDrawColor(rgb[0], rgb[1], rgb[2]); }
+  function setFill(rgb:  [number, number, number]) { doc.setFillColor(rgb[0], rgb[1], rgb[2]); }
+  function setDraw(rgb:  [number, number, number]) { doc.setDrawColor(rgb[0], rgb[1], rgb[2]); }
 
   function drawGoldBar(y: number, full = false) {
     const bar = (x: number, w: number, c: [number, number, number]) => {
@@ -841,27 +907,6 @@ async function generateMultiPagePDF(
     doc.rect(8, 8, W - 16, H - 16);
   }
 
-  function coverFamilyBlock(members: FamilyMember[], placement: PagePlacement, startY: number, side: string): number {
-    const list = members.filter((m) => m.placement === placement);
-    if (list.length === 0) return startY;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    setColor(GOLD_D);
-    doc.text(side.toUpperCase(), W / 2, startY, { align: "center" });
-    let y = startY + 5;
-    list.forEach((m) => {
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      setColor(ESPRESSO);
-      doc.text(m.name || "—", W / 2, y, { align: "center" });
-      doc.setFontSize(7);
-      setColor(MUTED);
-      doc.text(m.relationship, W / 2, y + 3.5, { align: "center" });
-      y += 9;
-    });
-    return y;
-  }
-
   // ── PAGE 1: Cover ──────────────────────────────────────────
   bgPage(); borderFrame();
   drawGoldBar(12, true);
@@ -872,16 +917,17 @@ async function generateMultiPagePDF(
   centeredText("Est. 2020 · Premium Wedding Stationery", 36, 6, MUTED);
   ornamentalDivider(40);
 
-  // Intro wording — use AI-generated text when available, fall back to static VIBE_INTRO
-  const coverWording = aiWording ?? VIBE_INTRO[matter.vibe];
-  const introLines = doc.splitTextToSize(coverWording, W - 60);
-  doc.setFontSize(8.5);
+  // Intro wording — from Gemini or fallback
+  const coverWording = aiWording || VIBE_INTRO[matter.vibe] ||
+    "With joyful hearts and the blessings of our families, we invite you to celebrate this beautiful union.";
   doc.setFont("helvetica", "italic");
+  doc.setFontSize(8.5);
   setColor(ESPRESSO);
+  const introLines = doc.splitTextToSize(coverWording, W - 60);
   let introY = 52;
   introLines.forEach((line: string) => {
     doc.text(line, W / 2, introY, { align: "center" });
-    introY += 5;
+    introY += 5.5;
   });
   introY += 4;
   ornamentalDivider(introY);
@@ -904,7 +950,7 @@ async function generateMultiPagePDF(
     doc.text("WITH THE BLESSINGS OF", W / 2, famY, { align: "center" });
     famY += 6;
 
-    // Two-column
+    // Two-column layout
     const leftX = 40, rightX = W / 2 + 5;
     if (coverBrideList.length > 0) {
       doc.setFontSize(7); doc.setFont("helvetica", "bold"); setColor(GOLD_D);
@@ -957,6 +1003,9 @@ async function generateMultiPagePDF(
   centeredText("Generated with ❤ by PrinceCards", H - 14, 6, MUTED);
 
   // ── EVENT PAGES ────────────────────────────────────────────
+  const EVENT_WORDING =
+    "We request the honour of your presence to witness and bless this sacred ceremony. Your presence and blessings mean the world to us.";
+
   matter.selectedEvents.forEach((ev, idx) => {
     doc.addPage();
     const d = matter.eventDetails[ev];
@@ -964,22 +1013,13 @@ async function generateMultiPagePDF(
     drawGoldBar(12, true);
     drawGoldBar(H - 15, true);
 
-    // Page number ornament
     centeredText(`— PAGE ${idx + 2} —`, 26, 6.5, MUTED);
-
-    // Event name as large header
     centeredText(EVENT_ICONS[ev], 46, 22, ESPRESSO);
     centeredText(ev.toUpperCase(), 58, 18, ESPRESSO, "bold");
     ornamentalDivider(63);
 
-    // Vibe wording for event
-    const eventWording: Record<VibeType, string> = {
-      Traditional: `We, with utmost reverence and joy, invite you to grace the sacred ceremony of ${ev} and shower your blessings upon the union.`,
-      Royal:       `The esteemed families request the honour of your distinguished presence at the ${ev} ceremony, to witness this regal celebration.`,
-      Modern:      `Join us for a beautiful ${ev} celebration — good vibes, great company, and memories to last a lifetime!`,
-      Quirky:      `${ev} time! Things are about to get beautiful, maybe a little chaotic, and 100% unforgettable. You're invited! 🥳`,
-    };
-    const wLines = doc.splitTextToSize(eventWording[matter.vibe], W - 60);
+    // Event wording
+    const wLines = doc.splitTextToSize(EVENT_WORDING, W - 60);
     doc.setFontSize(9); doc.setFont("helvetica", "italic"); setColor(ESPRESSO);
     let wY = 75;
     wLines.forEach((l: string) => { doc.text(l, W / 2, wY, { align: "center" }); wY += 5.5; });
@@ -988,8 +1028,8 @@ async function generateMultiPagePDF(
 
     // Detail boxes
     const fields = [
-      { label: "DATE", value: d.date || "TBD" },
-      { label: "TIME", value: d.time || "TBD" },
+      { label: "DATE",  value: d.date  || "TBD" },
+      { label: "TIME",  value: d.time  || "TBD" },
       { label: "VENUE", value: d.venue || "TBD" },
     ];
     fields.forEach(({ label, value }) => {
@@ -1027,7 +1067,6 @@ async function generateMultiPagePDF(
       }
     }
 
-    // Footer
     centeredText("princecards.in  ·  +91 98260 15250", H - 20, 6, MUTED);
   });
 
@@ -1042,13 +1081,8 @@ async function generateMultiPagePDF(
   centeredText("WITH LOVE & GRATITUDE", 58, 12, ESPRESSO, "bold");
   ornamentalDivider(63);
 
-  const lastWording: Record<VibeType, string> = {
-    Traditional: "Your presence and blessings are the greatest gift to our family. We humbly request the honour of your company on this auspicious occasion.",
-    Royal:       "We are honoured beyond measure to have you witness this celebration. Your presence shall make this occasion truly unforgettable.",
-    Modern:      "Your presence is literally all we need. Come, celebrate, and make memories with us!",
-    Quirky:      "You made it to the last page — you deserve a gold star ⭐ and a front-row seat at the wedding!",
-  };
-  const lwLines = doc.splitTextToSize(lastWording[matter.vibe], W - 60);
+  const closingText = "Your presence and blessings are the greatest gift to our family. We look forward to celebrating this joyous occasion with you.";
+  const lwLines = doc.splitTextToSize(closingText, W - 60);
   doc.setFontSize(9.5); doc.setFont("helvetica", "italic"); setColor(ESPRESSO);
   let lwY = 78;
   lwLines.forEach((l: string) => { doc.text(l, W / 2, lwY, { align: "center" }); lwY += 5.5; });
@@ -1078,19 +1112,18 @@ async function generateMultiPagePDF(
   centeredText("PRINCECARDS", lwY, 14, GOLD_D, "bold"); lwY += 8;
   centeredText("Crafting Timeless Wedding Invitations", lwY, 7, MUTED); lwY += 6;
   centeredText("princecards.in  ·  WhatsApp: +91 98260 15250", lwY, 7, MUTED);
-
   centeredText("Generated with ❤ by PrinceCards", H - 14, 6, MUTED);
 
   // Save
-  doc.save(`PrinceCards_Matter_${bride.replace(/\s+/g, "_")}_${groom.replace(/\s+/g, "_")}.pdf`);
+  const safeBride = bride.replace(/[^\w\s]/g, "").replace(/\s+/g, "_");
+  const safeGroom = groom.replace(/[^\w\s]/g, "").replace(/\s+/g, "_");
+  doc.save(`PrinceCards_Matter_${safeBride}_${safeGroom}.pdf`);
   markDownloaded();
 }
 
 // ─────────────────────────────────────────────────────────────
 // Main Wizard Component
 // ─────────────────────────────────────────────────────────────
-const TOTAL_STEPS = 5; // 1-4 = wizard steps, 5 = review
-
 export default function MatterWizard() {
   const { savedMatter, isMatterSaved, isMatterDownloaded, saveMatter, resetMatter, markDownloaded } = useMatter();
 
@@ -1116,6 +1149,8 @@ export default function MatterWizard() {
   const [vibe, setVibe] = useState<VibeType | null>(null);
 
   // Step 4
+  const [brideName, setBrideName] = useState("");
+  const [groomName, setGroomName] = useState("");
   const [brideFamily, setBrideFamily] = useState<FamilyMember[]>([]);
   const [groomFamily, setGroomFamily] = useState<FamilyMember[]>([]);
 
@@ -1142,7 +1177,7 @@ export default function MatterWizard() {
     if (currentStep === 1) return selectedEvents.length > 0;
     if (currentStep === 2) return true; // details are optional
     if (currentStep === 3) return vibe !== null;
-    if (currentStep === 4) return true;
+    if (currentStep === 4) return true; // family optional
     return true;
   })();
 
@@ -1158,21 +1193,13 @@ export default function MatterWizard() {
     if (!vibe) return;
     setAiError(null);
 
-    const bride = brideFamily.find((m) => m.relationship === "Parent")?.name
-      ?? brideFamily[0]?.name ?? "Bride";
-    const groom = groomFamily.find((m) => m.relationship === "Parent")?.name
-      ?? groomFamily[0]?.name ?? "Groom";
+    const bride = brideName.trim() || "Bride";
+    const groom  = groomName.trim() || "Groom";
 
-    // Format raw HTML5 picker values into human-readable strings
-    // e.g. '2026-02-12' → 'February 12th, 2026'  |  '19:00' → '7:00 PM'
     const formattedDetails = Object.fromEntries(
       (Object.keys(eventDetails) as EventName[]).map((ev) => {
         const d = eventDetails[ev];
-        return [ev, {
-          date:  formatDate(d.date),
-          time:  formatTime(d.time),
-          venue: d.venue,
-        }];
+        return [ev, { date: formatDate(d.date), time: formatTime(d.time), venue: d.venue }];
       })
     ) as Record<EventName, EventDetail>;
 
@@ -1182,20 +1209,24 @@ export default function MatterWizard() {
     };
     saveMatter(matter);
 
-    // ── Phase 1: Call Gemini for AI cover wording ──────────
+    // ── Phase 1: Call Gemini for cover wording ─────────────
     let aiWording: string | undefined;
     setGeneratingStage("ai");
     try {
       const res = await fetch("/api/generate-wording", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vibe, selectedEvents, eventDetails: formattedDetails, brideFamily, groomFamily }),
+        body: JSON.stringify({
+          vibe, selectedEvents, eventDetails: formattedDetails,
+          brideFamily, groomFamily,
+          brideName: bride, groomName: groom,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.wording) {
         aiWording = data.wording as string;
       } else {
-        // Non-fatal: fall back to static wording
+        // Non-fatal: the PDF will use the vibe fallback text
         setAiError(data.error ?? "AI wording unavailable — using default text.");
       }
     } catch (err) {
@@ -1221,13 +1252,15 @@ export default function MatterWizard() {
     setSelectedEvents([]);
     setEventDetails({ Haldi: emptyDetail(), Mehendi: emptyDetail(), Sangeet: emptyDetail(), Wedding: emptyDetail(), Reception: emptyDetail() });
     setVibe(null);
+    setBrideName("");
+    setGroomName("");
     setBrideFamily([]);
     setGroomFamily([]);
     setAiError(null);
     setGeneratingStage(null);
   };
 
-  // ── Render ────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────
   return (
     <section className="mx-auto max-w-screen-lg px-4 md:px-8 py-12" aria-label="Card Matter">
 
@@ -1298,9 +1331,9 @@ export default function MatterWizard() {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--color-accent-dark)" }}>
-                    {currentStep <= 4
-                      ? `Step ${currentStep} of 4 — ${STEP_LABELS[currentStep - 1]}`
-                      : "Step 5 — Review & Generate"}
+                    {currentStep < TOTAL_STEPS
+                      ? `Step ${currentStep} of ${TOTAL_STEPS - 1} — ${STEP_LABELS[currentStep - 1]}`
+                      : "Review & Generate"}
                   </p>
                 </div>
                 <button
@@ -1334,14 +1367,16 @@ export default function MatterWizard() {
               )}
               {currentStep === 4 && (
                 <Step4Family
+                  brideName={brideName} groomName={groomName}
+                  onBrideNameChange={setBrideName} onGroomNameChange={setGroomName}
                   brideFamily={brideFamily} groomFamily={groomFamily}
                   onBrideAdd={brideAdd} onBrideUpdate={brideUpdate} onBrideRemove={brideRemove}
                   onGroomAdd={groomAdd} onGroomUpdate={groomUpdate} onGroomRemove={groomRemove}
                 />
               )}
-              {currentStep === 5 && vibe && (
+              {currentStep === TOTAL_STEPS && vibe && (
                 <>
-                  {/* AI error banner — non-fatal, PDF still generates with fallback */}
+                  {/* AI error banner — non-fatal, PDF still generates with fallback wording */}
                   {aiError && (
                     <div className="mb-4 rounded-xl px-4 py-3 flex items-start gap-3"
                       style={{ backgroundColor: "#FFFBEB", border: "1px solid #FDE68A" }}>
@@ -1367,7 +1402,7 @@ export default function MatterWizard() {
               )}
 
               {/* Navigation buttons */}
-              {currentStep < 5 && (
+              {currentStep < TOTAL_STEPS && (
                 <div className="flex items-center justify-between mt-8">
                   <button
                     type="button"
@@ -1391,7 +1426,7 @@ export default function MatterWizard() {
                     className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02]"
                     style={{ background: "linear-gradient(135deg, var(--color-accent), var(--color-accent-dark))", color: "white", boxShadow: canProceed ? "0 4px 14px rgba(212,175,55,0.3)" : "none" }}
                   >
-                    {currentStep === 4 ? "Review" : "Next"}
+                    {currentStep === TOTAL_STEPS - 1 ? "Review" : "Next"}
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="9 18 15 12 9 6" />

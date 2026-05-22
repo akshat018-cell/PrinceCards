@@ -23,26 +23,23 @@ interface GenerateWordingRequest {
   eventDetails:   Record<EventName, EventDetail>;
   brideFamily:    FamilyMember[];
   groomFamily:    FamilyMember[];
+  brideName?:     string;
+  groomName?:     string;
 }
 
-// ── Build a rich, structured prompt from the wizard data ──────────────────────
+// ── Build the user prompt ─────────────────────────────────────────────────────
 function buildPrompt(data: GenerateWordingRequest): string {
-  const { vibe, selectedEvents, eventDetails, brideFamily, groomFamily } = data;
+  const { vibe, selectedEvents, eventDetails, brideFamily, groomFamily, brideName, groomName } = data;
 
-  // Flatten family members into readable strings
   const formatFamily = (members: FamilyMember[], side: string) => {
-    const coverMembers  = members.filter((m) => m.placement === "Cover Page");
-    const eventMembers  = members.filter((m) => m.placement === "Event Pages");
-    const lastMembers   = members.filter((m) => m.placement === "Last Page");
     const fmt = (list: FamilyMember[]) =>
       list.length ? list.map((m) => `${m.name} (${m.relationship})`).join(", ") : "none listed";
     return `  ${side}:
-    - Cover Page: ${fmt(coverMembers)}
-    - Event Pages: ${fmt(eventMembers)}
-    - Last Page: ${fmt(lastMembers)}`;
+    - Cover Page: ${fmt(members.filter((m) => m.placement === "Cover Page"))}
+    - Event Pages: ${fmt(members.filter((m) => m.placement === "Event Pages"))}
+    - Last Page:   ${fmt(members.filter((m) => m.placement === "Last Page"))}`;
   };
 
-  // Build events summary
   const eventsSummary = selectedEvents
     .map((ev) => {
       const d = eventDetails[ev];
@@ -52,6 +49,7 @@ function buildPrompt(data: GenerateWordingRequest): string {
     .join("\n");
 
   return `
+Couple: ${brideName || "Bride"} & ${groomName || "Groom"}
 Wedding Vibe: ${vibe}
 
 Events being celebrated:
@@ -67,50 +65,41 @@ ${formatFamily(groomFamily, "Groom's Side")}
 function buildSystemInstruction(vibe: VibeType): string {
   const toneGuide: Record<VibeType, string> = {
     Traditional:
-      "Use highly respectful, classical Hindi/Sanskrit phrases (e.g., 'श्री गणेशाय नमः', 'Shubh Vivah'). " +
-      "The language must be warm, pious, and rooted in Indian cultural tradition. " +
-      "Address guests with reverence ('your esteemed presence', 'kind blessings'). " +
-      "Include a Sanskrit shloka or blessing if appropriate.",
+      "Use highly respectful, classical phrases rooted in Indian cultural tradition. " +
+      "The language must be warm, pious, and reverential. Include a traditional blessing or invocation.",
 
     Royal:
-      "Use regal, palatial, and formally elevated English. " +
-      "Phrases like 'request the honour of your distinguished presence', 'esteemed families', " +
-      "'this grand occasion' must feel like a Maharaja's court invitation. " +
-      "The tone is dignified, grand, and timeless — never casual.",
+      "Use regal, palatial, and formally elevated language. " +
+      "Phrases must feel like a Maharaja's court invitation. Dignified, grand, and timeless.",
 
     Modern:
-      "Use clean, contemporary, and heartfelt English. Short sentences. " +
-      "Warm but not overly formal — like a beautifully written personal note. " +
-      "Think: 'Two hearts. One beautiful journey. We'd love for you to be there.' " +
-      "Avoid heavy ornamentation. Keep it crisp and genuine.",
+      "Use clean, contemporary, and heartfelt language. Short sentences. " +
+      "Warm but not overly formal — like a beautifully written personal note.",
 
     Quirky:
       "Use playful, witty, and fun language with light humour and personality. " +
-      "Emojis are welcome (🎉💍✨). Phrases like 'plot twist', 'chaos and love', " +
-      "'you're invited to the party of the century' are perfect. " +
-      "Keep it joyful, irreverent, and completely unique — not generic.",
+      "Emojis are welcome (🎉💍✨). Keep it joyful and completely unique.",
   };
 
-  return `You are an expert Indian wedding invitation copywriter with 20 years of experience crafting premium, culturally-sensitive invitation wording for high-end clients across India.
-
-Your task is to write the COVER PAGE wording for a multi-page wedding invitation PDF. This is the most important page — it must immediately captivate the reader.
-
-TONE GUIDE for this invitation (${vibe}):
-${toneGuide[vibe]}
-
-STRICT RULES:
-1. Output ONLY the wording text. No headings, no labels, no explanations, no markdown.
-2. The wording must be a single, cohesive, beautifully flowing paragraph or short verse — NOT a bulleted list.
-3. Naturally weave in the names of the family members provided (especially Cover Page members) as the hosts/blessers of the event.
-4. Do NOT include specific event dates/times/venues in the cover wording — those appear on separate event pages.
-5. Keep it between 60 and 120 words — concise yet rich.
-6. End with a warm, memorable closing line that feels like a personal embrace.
-7. If the vibe is Traditional, you may open with a Sanskrit/Hindi phrase but the rest must be in English.`;
+  return [
+    `You are an expert Indian wedding invitation copywriter with 20 years of experience.`,
+    ``,
+    `Your task: Write a single, beautiful cover-page invitation paragraph in ENGLISH ONLY.`,
+    `The paragraph will appear on the front cover of a premium wedding invitation card.`,
+    ``,
+    `TONE GUIDE (${vibe}):`,
+    toneGuide[vibe],
+    ``,
+    `RULES:`,
+    `1. Write 60–120 words of flowing, premium English prose. No bullet points.`,
+    `2. Naturally weave in the names of Cover Page family members as the hosts or blessers.`,
+    `3. Do NOT mention specific event dates, times, or venues — those appear on separate pages.`,
+    `4. Output ONLY the invitation paragraph — no titles, no labels, no JSON.`,
+  ].join("\n");
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // 1. Validate API key
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -119,7 +108,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Parse and validate request body
   let body: GenerateWordingRequest;
   try {
     body = await req.json();
@@ -128,6 +116,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { vibe, selectedEvents, eventDetails, brideFamily, groomFamily } = body;
+
   if (!vibe || !selectedEvents?.length) {
     return NextResponse.json(
       { error: "Missing required fields: vibe and selectedEvents." },
@@ -135,11 +124,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3. Call Gemini
+  const brideName = body.brideName || "Bride";
+  const groomName = body.groomName || "Groom";
+
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    const userPrompt = buildPrompt({ vibe, selectedEvents, eventDetails, brideFamily, groomFamily });
+    const userPrompt       = buildPrompt({ vibe, selectedEvents, eventDetails, brideFamily, groomFamily, brideName, groomName });
     const systemInstruction = buildSystemInstruction(vibe);
 
     const response = await ai.models.generateContent({
@@ -147,26 +138,21 @@ export async function POST(req: NextRequest) {
       contents: userPrompt,
       config: {
         systemInstruction,
-        temperature: 0.85,
-        topP: 0.95,
+        temperature: 0.8,
+        topP:        0.95,
         maxOutputTokens: 512,
       },
     });
 
-    const wording = response.text?.trim();
-
-    if (!wording) {
-      return NextResponse.json(
-        { error: "Gemini returned an empty response." },
-        { status: 502 }
-      );
-    }
+    const wording = response.text?.trim() ?? "";
 
     return NextResponse.json({ wording }, { status: 200 });
 
   } catch (err: unknown) {
     console.error("[generate-wording] Gemini API error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error from Gemini API.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json(
+      { error: "AI wording unavailable. Please try again." },
+      { status: 500 }
+    );
   }
 }
