@@ -1,101 +1,164 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import { useState, useRef, useEffect, useCallback } from "react";
 
-// ── Royal Minimalist shared input styles ──────────────────────
-const BASE_INPUT_STYLE: React.CSSProperties = {
+// ── Nominatim result shape (fields we use) ────────────────────
+interface NominatimResult {
+  place_id:     number;
+  display_name: string;
+  address?: {
+    road?:            string;
+    suburb?:          string;
+    city?:            string;
+    state_district?:  string;
+    state?:           string;
+    country?:         string;
+  };
+}
+
+// Derive a clean two-line label from a Nominatim result
+function parseResult(r: NominatimResult): { main: string; sub: string } {
+  const parts = r.display_name.split(", ");
+  const main  = parts.slice(0, 2).join(", ");
+  const sub   = parts.slice(2, 5).join(", ");
+  return { main, sub };
+}
+
+// ── Shared style tokens ───────────────────────────────────────
+const INPUT_BASE: React.CSSProperties = {
   border:          "1.5px solid var(--color-card-border)",
-  backgroundColor: "var(--color-tag-bg)",
-  color:           "var(--color-text)",
+  backgroundColor: "#FCFBF9",
+  color:           "#2D2B2A",
   width:           "100%",
   borderRadius:    "0.5rem",
-  padding:         "0.625rem 2.5rem 0.625rem 0.75rem",  // right padding for clear button
+  padding:         "0.625rem 2.25rem 0.625rem 2rem", // left: icon, right: clear btn
   fontSize:        "0.875rem",
   outline:         "none",
-  transition:      "border-color 0.2s, box-shadow 0.2s",
+  fontFamily:      "inherit",
+  transition:      "border-color 0.18s, box-shadow 0.18s",
 };
 
-const FOCUS_STYLE: React.CSSProperties = {
-  borderColor: "var(--color-accent)",
-  boxShadow:   "0 0 0 2.5px rgba(212,175,55,0.18)",
+const FOCUS: React.CSSProperties = {
+  borderColor: "#D4AF37",
+  boxShadow:   "0 0 0 2.5px rgba(212,175,55,0.2)",
 };
 
+// ── Component ─────────────────────────────────────────────────
 interface VenueAutocompleteProps {
   value:    string;
   onChange: (venue: string) => void;
-  eventId:  string; // used for unique input id
+  eventId:  string;
 }
 
 export function VenueAutocomplete({ value, onChange, eventId }: VenueAutocompleteProps) {
-  const {
-    ready,
-    value:  inputVal,
-    setValue,
-    suggestions: { status, data },
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      // Bias towards Indian venues
-      componentRestrictions: { country: "in" },
-      types: ["establishment", "geocode"],
-    },
-    debounce: 280,
-    defaultValue: value,
-  });
+  const [inputVal,     setInputVal]     = useState(value);
+  const [results,      setResults]      = useState<NominatimResult[]>([]);
+  const [loading,      setLoading]      = useState(false);
+  const [open,         setOpen]         = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const inputRef    = useRef<HTMLInputElement>(null);
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef     = useRef<HTMLInputElement>(null);
+  const abortRef     = useRef<AbortController | null>(null);
 
-  // Sync external value changes (e.g. reset) back into the hook
+  // Sync parent resets (e.g. wizard reset)
   useEffect(() => {
-    if (value !== inputVal) setValue(value, false);
+    if (value !== inputVal) setInputVal(value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
-          && inputRef.current && !inputRef.current.contains(e.target as Node)) {
-        clearSuggestions();
+    function onOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [clearSuggestions]);
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, []);
 
-  const handleSelect = async (description: string) => {
-    setValue(description, false);
-    onChange(description);
-    clearSuggestions();
-    // Optionally geocode (for future map features — no blocking call required)
-    try {
-      const results = await getGeocode({ address: description });
-      await getLatLng(results[0]); // available if needed later
-    } catch { /* non-fatal */ }
+  // Debounced Nominatim fetch
+  const fetchSuggestions = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim() || query.length < 3) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      // Cancel previous in-flight request
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+
+      setLoading(true);
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("format",         "json");
+        url.searchParams.set("q",              query);
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("countrycodes",   "in");
+        url.searchParams.set("limit",          "6");
+
+        const res = await fetch(url.toString(), {
+          signal:  abortRef.current.signal,
+          headers: {
+            // Nominatim requires a meaningful User-Agent per their usage policy
+            "Accept-Language": "en",
+          },
+        });
+        if (!res.ok) throw new Error("Nominatim error");
+        const data: NominatimResult[] = await res.json();
+        setResults(data);
+        setOpen(data.length > 0);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setResults([]);
+          setOpen(false);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  }, []);
+
+  const handleChange = (val: string) => {
+    setInputVal(val);
+    onChange(val); // always keep parent in sync with typed text (manual fallback)
+    fetchSuggestions(val);
+  };
+
+  const handleSelect = (r: NominatimResult) => {
+    const { main } = parseResult(r);
+    // Use the full display_name for maximum detail in the PDF / AI prompt
+    setInputVal(r.display_name);
+    onChange(r.display_name);
+    setResults([]);
+    setOpen(false);
   };
 
   const handleClear = () => {
-    setValue("", false);
+    setInputVal("");
     onChange("");
-    clearSuggestions();
+    setResults([]);
+    setOpen(false);
     inputRef.current?.focus();
   };
 
-  const hasSuggestions = status === "OK" && data.length > 0;
-
   return (
-    <div className="relative" id={`venue-wrap-${eventId}`}>
-      {/* Input */}
+    <div ref={containerRef} className="relative" id={`venue-wrap-${eventId}`}>
+
+      {/* ── Input ─────────────────────────────────────────── */}
       <div className="relative">
-        {/* Map pin icon */}
+
+        {/* Map-pin icon */}
         <span
           className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
           aria-hidden
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-            fill="none" stroke="var(--color-accent)" strokeWidth="2.5"
+            fill="none" stroke="#D4AF37" strokeWidth="2.5"
             strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
             <circle cx="12" cy="10" r="3" />
@@ -107,98 +170,124 @@ export function VenueAutocomplete({ value, onChange, eventId }: VenueAutocomplet
           id={`venue-input-${eventId}`}
           type="text"
           autoComplete="off"
-          disabled={!ready}
+          spellCheck={false}
           value={inputVal}
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (!e.target.value) onChange("");
-          }}
-          placeholder={ready ? "Search venue, hall, or address…" : "Loading Maps…"}
-          style={{ ...BASE_INPUT_STYLE, paddingLeft: "2rem" }}
-          onFocus={(e) => Object.assign(e.currentTarget.style, FOCUS_STYLE)}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="Type or search a venue, hall, or address…"
+          style={INPUT_BASE}
+          onFocus={(e) => Object.assign(e.currentTarget.style, FOCUS)}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = "var(--color-card-border)";
             e.currentTarget.style.boxShadow   = "none";
           }}
           aria-label="Venue"
           aria-autocomplete="list"
-          aria-controls={hasSuggestions ? `venue-list-${eventId}` : undefined}
-          aria-expanded={hasSuggestions}
+          aria-controls={open ? `venue-list-${eventId}` : undefined}
+          aria-expanded={open}
         />
 
-        {/* Clear button — only when there's text */}
-        {inputVal && (
-          <button
-            type="button"
-            onClick={handleClear}
-            aria-label="Clear venue"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full transition-colors duration-150"
-            style={{ color: "var(--color-muted)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-muted)")}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18M6 6l12 12" />
+        {/* Loading spinner or clear button */}
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center">
+          {loading ? (
+            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg"
+              width="12" height="12" viewBox="0 0 24 24"
+              fill="none" stroke="#D4AF37" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
-          </button>
-        )}
+          ) : inputVal ? (
+            <button
+              type="button"
+              onClick={handleClear}
+              aria-label="Clear venue"
+              className="flex items-center justify-center rounded-full transition-colors duration-150"
+              style={{ color: "var(--color-muted)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#2D2B2A")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-muted)")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="3"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
+        </span>
       </div>
 
-      {/* Suggestions dropdown */}
-      {hasSuggestions && (
+      {/* ── Dropdown ──────────────────────────────────────── */}
+      {open && results.length > 0 && (
         <div
-          ref={dropdownRef}
           id={`venue-list-${eventId}`}
           role="listbox"
           className="absolute left-0 right-0 mt-1.5 rounded-xl overflow-hidden z-50"
           style={{
-            backgroundColor: "var(--color-white)",
+            backgroundColor: "#FCFBF9",
             border:          "1px solid var(--color-card-border)",
-            boxShadow:       "0 8px 32px rgba(45,43,42,0.14)",
+            boxShadow:       "0 10px 36px rgba(45,43,42,0.14)",
           }}
         >
-          {data.map(({ place_id, description, structured_formatting }) => (
-            <button
-              key={place_id}
-              type="button"
-              role="option"
-              aria-selected={false}
-              onClick={() => handleSelect(description)}
-              className="w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 transition-colors duration-100"
-              style={{ color: "var(--color-text)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(212,175,55,0.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              {/* Gold location dot */}
-              <span className="flex-shrink-0 mt-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
-                  fill="none" stroke="var(--color-accent)" strokeWidth="2.5"
-                  strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-              </span>
-
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold truncate" style={{ color: "var(--color-text)" }}>
-                  {structured_formatting.main_text}
+          {results.map((r) => {
+            const { main, sub } = parseResult(r);
+            return (
+              <button
+                key={r.place_id}
+                type="button"
+                role="option"
+                aria-selected={false}
+                onClick={() => handleSelect(r)}
+                className="w-full text-left px-3.5 py-2.5 flex items-start gap-2.5 transition-colors duration-100"
+                style={{ color: "#2D2B2A" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(212,175,55,0.09)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                {/* Gold location dot */}
+                <span className="flex-shrink-0 mt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                    fill="none" stroke="#D4AF37" strokeWidth="2.5"
+                    strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
                 </span>
-                <span className="block text-[10px] truncate mt-0.5" style={{ color: "var(--color-muted)" }}>
-                  {structured_formatting.secondary_text}
-                </span>
-              </span>
-            </button>
-          ))}
 
-          {/* Powered by Google badge */}
-          <div className="flex items-center justify-end px-3 py-1.5 border-t"
-            style={{ borderColor: "var(--color-card-border)", backgroundColor: "var(--color-tag-bg)" }}>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold truncate" style={{ color: "#2D2B2A" }}>
+                    {main}
+                  </span>
+                  {sub && (
+                    <span className="block text-[10px] truncate mt-0.5" style={{ color: "var(--color-muted)" }}>
+                      {sub}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Footer attribution — required by Nominatim usage policy */}
+          <div
+            className="flex items-center gap-1.5 justify-end px-3.5 py-1.5 border-t"
+            style={{ borderColor: "var(--color-card-border)", backgroundColor: "rgba(212,175,55,0.04)" }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24"
+              fill="none" stroke="var(--color-muted)" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
             <span className="text-[9px] tracking-wide uppercase" style={{ color: "var(--color-muted)" }}>
-              Powered by Google
+              © OpenStreetMap contributors
             </span>
           </div>
         </div>
+      )}
+
+      {/* Manual-fallback hint — shows only when user has text but no dropdown is open */}
+      {!open && inputVal && results.length === 0 && !loading && (
+        <p className="mt-1 text-[10px]" style={{ color: "var(--color-muted)" }}>
+          ✓ Custom venue saved — no selection required.
+        </p>
       )}
     </div>
   );

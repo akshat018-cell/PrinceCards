@@ -6,7 +6,6 @@ import type {
   EventName, VibeType, Relationship, PagePlacement,
   EventDetail, FamilyMember, SavedMatter,
 } from "@/context/MatterContext";
-import { GoogleMapsLoader } from "@/components/GoogleMapsLoader";
 import { VenueAutocomplete } from "@/components/VenueAutocomplete";
 
 // ─────────────────────────────────────────────────────────────
@@ -210,34 +209,35 @@ function FieldLabel({ children }: { children: string }) {
   );
 }
 
-/** Native date / time input with Royal Minimalist styling */
+/** Native date / time input — light-mode panel, Champagne Gold accent, Royal Minimalist shell */
 function NativePicker({
   type, value, onChange, id,
 }: { type: "date" | "time"; value: string; onChange: (v: string) => void; id: string }) {
   return (
-    <div className="relative">
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200 appearance-none"
-        style={{
-          border:          "1.5px solid var(--color-card-border)",
-          backgroundColor: "var(--color-tag-bg)",
-          color:           value ? "var(--color-text)" : "var(--color-muted)",
-          fontFamily:      "inherit",
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = "var(--color-accent)";
-          e.currentTarget.style.boxShadow   = "0 0 0 2.5px rgba(212,175,55,0.18)";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = "var(--color-card-border)";
-          e.currentTarget.style.boxShadow   = "none";
-        }}
-      />
-    </div>
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200 appearance-none accent-[#D4AF37]"
+      style={{
+        border:          "1.5px solid var(--color-card-border)",
+        backgroundColor: "#FCFBF9",
+        color:           value ? "#2D2B2A" : "var(--color-muted)",
+        fontFamily:      "inherit",
+        // Forces the browser-native calendar/clock panel into light mode
+        // so it doesn't inherit a dark OS theme and show a black background
+        colorScheme:     "light",
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = "#D4AF37";
+        e.currentTarget.style.boxShadow   = "0 0 0 2.5px rgba(212,175,55,0.2)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = "var(--color-card-border)";
+        e.currentTarget.style.boxShadow   = "none";
+      }}
+    />
   );
 }
 
@@ -257,57 +257,51 @@ function Step2Details({
         Pick a date &amp; time, then search for your venue — all fields are optional.
       </p>
 
-      {/* Load Google Maps SDK once for all venue autocompletes on the page */}
-      <GoogleMapsLoader>
-        <div className="space-y-5">
-          {events.map((ev) => (
-            <div key={ev} className="rounded-xl p-4"
-              style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)" }}>
+      <div className="space-y-5">
+        {events.map((ev) => (
+          <div key={ev} className="rounded-xl p-4"
+            style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)" }}>
 
-              {/* Event header */}
-              <p className="text-sm font-bold mb-4 flex items-center gap-2"
-                style={{ color: "var(--color-accent-dark)" }}>
-                <span>{EVENT_ICONS[ev]}</span> {ev}
-              </p>
+            {/* Event header */}
+            <p className="text-sm font-bold mb-4 flex items-center gap-2"
+              style={{ color: "var(--color-accent-dark)" }}>
+              <span>{EVENT_ICONS[ev]}</span> {ev}
+            </p>
 
-              {/* Date + Time side by side, Venue full-width below */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                {/* Date */}
-                <div>
-                  <FieldLabel>Date</FieldLabel>
-                  <NativePicker
-                    id={`date-${ev}`}
-                    type="date"
-                    value={details[ev].date}
-                    onChange={(v) => onChange(ev, "date", v)}
-                  />
-                </div>
-
-                {/* Time */}
-                <div>
-                  <FieldLabel>Time</FieldLabel>
-                  <NativePicker
-                    id={`time-${ev}`}
-                    type="time"
-                    value={details[ev].time}
-                    onChange={(v) => onChange(ev, "time", v)}
-                  />
-                </div>
-              </div>
-
-              {/* Venue — full width */}
+            {/* Date + Time side by side */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <FieldLabel>Venue</FieldLabel>
-                <VenueAutocomplete
-                  eventId={ev}
-                  value={details[ev].venue}
-                  onChange={(v) => onChange(ev, "venue", v)}
+                <FieldLabel>Date</FieldLabel>
+                <NativePicker
+                  id={`date-${ev}`}
+                  type="date"
+                  value={details[ev].date}
+                  onChange={(v) => onChange(ev, "date", v)}
+                />
+              </div>
+              <div>
+                <FieldLabel>Time</FieldLabel>
+                <NativePicker
+                  id={`time-${ev}`}
+                  type="time"
+                  value={details[ev].time}
+                  onChange={(v) => onChange(ev, "time", v)}
                 />
               </div>
             </div>
-          ))}
-        </div>
-      </GoogleMapsLoader>
+
+            {/* Venue — full width, OSM Nominatim autocomplete */}
+            <div>
+              <FieldLabel>Venue</FieldLabel>
+              <VenueAutocomplete
+                eventId={ev}
+                value={details[ev].venue}
+                onChange={(v) => onChange(ev, "venue", v)}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
