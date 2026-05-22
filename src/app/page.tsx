@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useMatter } from "@/context/MatterContext";
-import Image from "next/image";
 import Grid from "@/components/Grid";
 import Modal from "@/components/Modal";
+import MatterWizard from "@/components/MatterWizard";
 import {
   NAV_LINKS, TABS, PRICE_FILTERS, ALL_CARDS,
   filterByPrice,
@@ -158,188 +158,6 @@ function GlobalToast() {
         </svg>
       </button>
     </div>
-  );
-}
-
-// ── Matter Section ───────────────────────────────────────
-function MatterSection() {
-  const { savedMatter, isMatterSaved, isMatterDownloaded, saveMatter, markDownloaded } = useMatter();
-  const pdfRef = useRef<HTMLDivElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Local form state (only used before saving)
-  const [form, setForm] = useState({ bride: "", groom: "", date: "", venue: "" });
-
-  const handleSave = () => {
-    if (!form.bride || !form.groom || !form.date || !form.venue) return;
-    saveMatter(form);
-  };
-
-  const generatePDF = async () => {
-    const el = pdfRef.current;
-    if (!el || !savedMatter) return;
-    setIsGenerating(true);
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF }   = await import("jspdf");
-      el.style.left    = "0px";
-      el.style.opacity = "1";
-      await new Promise((r) => setTimeout(r, 80));
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#FFFFFF" });
-      el.style.left    = "-9999px";
-      el.style.opacity = "0";
-      const imgData = canvas.toDataURL("image/png");
-      const pdf     = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW   = pdf.internal.pageSize.getWidth();
-      const pageH   = pdf.internal.pageSize.getHeight();
-      const ratio   = canvas.width / canvas.height;
-      const imgH    = pageW / ratio;
-      const yOffset = (pageH - imgH) / 2;
-      pdf.addImage(imgData, "PNG", 0, yOffset > 0 ? yOffset : 0, pageW, imgH);
-      pdf.save(`PrinceCards_Matter_${savedMatter.bride}_${savedMatter.groom}.pdf`);
-      markDownloaded();
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <section className="mx-auto max-w-screen-lg px-4 md:px-8 py-12" aria-label="Card Matter">
-
-      {/* ── Hidden PDF Template ── */}
-      {savedMatter && (
-        <div ref={pdfRef} aria-hidden="true" style={{
-          position: "fixed", left: "-9999px", top: "20px", opacity: 0,
-          width: "794px", minHeight: "1123px", backgroundColor: "#FFFFFF",
-          fontFamily: "'Georgia', serif", padding: "64px 72px",
-          boxSizing: "border-box", pointerEvents: "none", zIndex: -1,
-        }}>
-          <div style={{ height: 6, background: "linear-gradient(90deg, #D4AF37, #B8961E)", borderRadius: 3, marginBottom: 40 }} />
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#B8961E", marginBottom: 8, fontFamily: "sans-serif" }}>Est. 2020 · Premium Wedding Stationery</p>
-            <h1 style={{ fontSize: 48, fontWeight: 700, color: "#2D2B2A", margin: 0 }}>PrinceCards</h1>
-            <p style={{ fontSize: 12, color: "#8A7F74", marginTop: 6, fontFamily: "sans-serif" }}>Crafting Timeless Wedding Invitations</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 40 }}>
-            <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, transparent, #D4AF37)" }} />
-            <span style={{ color: "#D4AF37", fontSize: 16 }}>★</span>
-            <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, #D4AF37, transparent)" }} />
-          </div>
-          <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.25em", color: "#B8961E", marginBottom: 20, fontFamily: "sans-serif" }}>Card Matter Details</p>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <p style={{ fontSize: 42, fontStyle: "italic", color: "#2D2B2A", margin: 0, lineHeight: 1.2 }}>
-              {savedMatter.bride}<span style={{ color: "#D4AF37", margin: "0 16px", fontStyle: "normal" }}>&amp;</span>{savedMatter.groom}
-            </p>
-          </div>
-          {[{ label: "📅 Wedding Date", value: savedMatter.date }, { label: "📍 Venue", value: savedMatter.venue }].map(({ label, value }) => (
-            <div key={label} style={{ display: "flex", gap: 16, marginBottom: 16, borderBottom: "1px solid #EDE8E0", paddingBottom: 16 }}>
-              <span style={{ fontSize: 11, textTransform: "uppercase", color: "#8A7F74", fontFamily: "sans-serif", minWidth: 130 }}>{label}</span>
-              <span style={{ fontSize: 15, color: "#2D2B2A", fontWeight: 500 }}>{value}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 60, borderTop: "1px solid #EDE8E0", paddingTop: 24, textAlign: "center" }}>
-            <p style={{ fontSize: 11, color: "#8A7F74", fontFamily: "sans-serif", margin: 0 }}>Generated by PrinceCards · princecards.in · WhatsApp: +91 98260 15250</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Page heading ── */}
-      <div className="text-center mb-10">
-        <p className="text-xs uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--color-accent)" }}>Card Matter</p>
-        <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "var(--font-playfair), serif" }}>Your Wedding Details</h2>
-        <p className="mt-3 text-sm max-w-md mx-auto" style={{ color: "var(--color-muted)" }}>
-          Fill in your details, save them, then download your Matter PDF to attach when ordering.
-        </p>
-      </div>
-
-      <div className="max-w-xl mx-auto">
-
-        {/* ── STATE A: Form (not yet saved) ── */}
-        {!isMatterSaved && (
-          <div className="rounded-2xl p-8" style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)", boxShadow: "var(--shadow-card)" }}>
-            <p className="text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "var(--color-accent-dark)" }}>Step 1 — Enter Your Details</p>
-            <div className="space-y-4">
-              {([
-                { key: "bride",  label: "Bride's Name",  placeholder: "e.g. Sneha" },
-                { key: "groom",  label: "Groom's Name",  placeholder: "e.g. Rahul" },
-                { key: "date",   label: "Wedding Date",   placeholder: "e.g. December 12th, 2026" },
-                { key: "venue",  label: "Venue",          placeholder: "e.g. Brilliant Convention Centre, Indore" },
-              ] as const).map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>{label}</label>
-                  <input
-                    type="text"
-                    value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all duration-200"
-                    style={{
-                      border: "1.5px solid var(--color-card-border)",
-                      backgroundColor: "var(--color-tag-bg)",
-                      color: "var(--color-text)",
-                    }}
-                    onFocus={(e) => (e.currentTarget.style.borderColor = "var(--color-accent)")}
-                    onBlur={(e) => (e.currentTarget.style.borderColor = "var(--color-card-border)")}
-                  />
-                </div>
-              ))}
-            </div>
-            <button
-              id="matter-save-btn"
-              onClick={handleSave}
-              disabled={!form.bride || !form.groom || !form.date || !form.venue}
-              className="mt-6 w-full rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "var(--color-accent)", color: "white" }}
-              onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = "var(--color-accent-dark)"; }}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent)")}>
-              Save Matter
-            </button>
-          </div>
-        )}
-
-        {/* ── STATE B: Saved details + Download PDF ── */}
-        {isMatterSaved && savedMatter && (
-          <div className="rounded-2xl p-8" style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)", boxShadow: "var(--shadow-card)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--color-accent-dark)" }}>Step 2 — Download Your PDF</p>
-              {isMatterDownloaded && (
-                <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  Downloaded
-                </span>
-              )}
-            </div>
-
-            {/* Saved details display */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {[{ label: "👰 Bride", value: savedMatter.bride }, { label: "🤵 Groom", value: savedMatter.groom }, { label: "📅 Date", value: savedMatter.date }, { label: "📍 Venue", value: savedMatter.venue }].map(({ label, value }) => (
-                <div key={label} className="rounded-xl p-3" style={{ backgroundColor: "var(--color-tag-bg)" }}>
-                  <p className="text-xs mb-1" style={{ color: "var(--color-muted)" }}>{label}</p>
-                  <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>{value}</p>
-                </div>
-              ))}
-            </div>
-
-            <button
-              id="matter-download-pdf-btn"
-              onClick={generatePDF}
-              disabled={isGenerating}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 hover:scale-[1.02] disabled:opacity-60 disabled:cursor-wait"
-              style={{ backgroundColor: "var(--color-accent)", color: "white" }}
-              onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = "var(--color-accent-dark)"; }}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-accent)")}>
-              {isGenerating ? (
-                <><svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>Generating…</>
-              ) : (
-                <><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>Download Matter PDF</>
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -559,7 +377,7 @@ export default function Home() {
         {activeView === "home" && <HeroSection onNavigate={handleNavigate} />}
 
         {/* ── Matter View ── */}
-        {activeView === "matter" && <MatterSection />}
+        {activeView === "matter" && <MatterWizard />}
 
         {/* ── Product Views (Wedding Cards / E-Card / E-Video) ── */}
         {isProductView(activeView) && (

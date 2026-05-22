@@ -72,12 +72,15 @@ export default function Modal({ item, onClose, onNavigateToMatter }: ModalProps)
   const handleEnquireNow = () => {
     const productLink = typeof window !== "undefined" ? window.location.href : "https://princecards.in";
     const matter = savedMatter;
+    const firstEvent = matter?.selectedEvents?.[0];
+    const firstEventDate = firstEvent ? (matter?.eventDetails?.[firstEvent]?.date ?? "") : "";
+    const firstEventVenue = firstEvent ? (matter?.eventDetails?.[firstEvent]?.venue ?? "") : "";
     const message =
       `Hello PrinceCards! I want to order this card: ${productLink}\n` +
       `Product: *${item.title}*\n` +
       `Price: ₹${item.price}/piece\n\n` +
       `My Matter details are summarized below, and I will attach the PDF file to this chat:\n` +
-      `👰 Bride: ${matter?.bride ?? ""} | 🤵 Groom: ${matter?.groom ?? ""} | 📅 Date: ${matter?.date ?? ""}`;
+      `👰 Bride: ${matter?.bride ?? ""} | 🤵 Groom: ${matter?.groom ?? ""} | 📅 ${firstEventDate} | 📍 ${firstEventVenue}`;
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/919826015250?text=${encoded}`, "_blank", "noopener,noreferrer");
   };
@@ -293,10 +296,10 @@ export default function Modal({ item, onClose, onNavigateToMatter }: ModalProps)
                     </p>
                     <div className="grid grid-cols-2 gap-y-2 text-xs">
                       {[
-                        ["👰 Bride",  savedMatter.bride],
-                        ["🤵 Groom",  savedMatter.groom],
-                        ["📅 Date",   savedMatter.date],
-                        ["📍 Venue",  savedMatter.venue],
+                        ["👰 Bride",   savedMatter.bride],
+                        ["🤵 Groom",   savedMatter.groom],
+                        ["🎉 Events",  savedMatter.selectedEvents.join(", ") || "—"],
+                        ["✨ Vibe",    savedMatter.vibe],
                       ].map(([label, value]) => (
                         <div key={label} className="col-span-2 flex gap-2">
                           <span style={{ color: "var(--color-muted)", minWidth: 60 }}>{label}</span>

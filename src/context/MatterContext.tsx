@@ -3,11 +3,34 @@
 import { createContext, useContext, useRef, useState, useCallback } from "react";
 
 // ── Types ──────────────────────────────────────────────────
+export type EventName = "Haldi" | "Mehendi" | "Sangeet" | "Wedding" | "Reception";
+export type VibeType  = "Traditional" | "Royal" | "Modern" | "Quirky";
+export type Relationship = "Grandparent" | "Parent" | "Sibling" | "Uncle/Aunt";
+export type PagePlacement = "Cover Page" | "Event Pages" | "Last Page";
+
+export interface EventDetail {
+  date:  string;
+  time:  string;
+  venue: string;
+}
+
+export interface FamilyMember {
+  id:           string;
+  name:         string;
+  relationship: Relationship;
+  placement:    PagePlacement;
+}
+
 export interface SavedMatter {
+  // Legacy compat
   bride: string;
   groom: string;
-  date: string;
-  venue: string;
+  // Wizard data
+  selectedEvents: EventName[];
+  eventDetails:   Record<EventName, EventDetail>;
+  vibe:           VibeType;
+  brideFamily:    FamilyMember[];
+  groomFamily:    FamilyMember[];
 }
 
 interface MatterContextValue {
@@ -16,6 +39,7 @@ interface MatterContextValue {
   isMatterDownloaded: boolean;
   showToast:          boolean;
   saveMatter:         (m: SavedMatter) => void;
+  resetMatter:        () => void;
   markDownloaded:     () => void;
   dismissToast:       () => void;
 }
@@ -40,6 +64,13 @@ export function MatterProvider({ children }: { children: React.ReactNode }) {
   const saveMatter = useCallback((m: SavedMatter) => {
     setSavedMatter(m);
     setIsMatterSaved(true);
+    setIsMatterDownloaded(false);
+  }, []);
+
+  const resetMatter = useCallback(() => {
+    setSavedMatter(null);
+    setIsMatterSaved(false);
+    setIsMatterDownloaded(false);
   }, []);
 
   const markDownloaded = useCallback(() => {
@@ -57,7 +88,7 @@ export function MatterProvider({ children }: { children: React.ReactNode }) {
   return (
     <MatterContext.Provider value={{
       savedMatter, isMatterSaved, isMatterDownloaded,
-      showToast, saveMatter, markDownloaded, dismissToast,
+      showToast, saveMatter, resetMatter, markDownloaded, dismissToast,
     }}>
       {children}
     </MatterContext.Provider>
