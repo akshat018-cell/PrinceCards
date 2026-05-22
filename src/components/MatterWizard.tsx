@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMatter } from "@/context/MatterContext";
 import type {
   EventName, VibeType, Relationship, PagePlacement,
   EventDetail, FamilyMember, SavedMatter,
 } from "@/context/MatterContext";
-import { VenueAutocomplete } from "@/components/VenueAutocomplete";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -67,10 +66,12 @@ export function formatDate(raw: string): string {
 
 /**
  * Converts '19:00' → '7:00 PM', '08:30' → '8:30 AM'.
- * Returns the original string unchanged if it isn't a valid 24-h time.
+ * If the string already contains 'AM' or 'PM' (from custom picker), returns it unchanged.
  */
 export function formatTime(raw: string): string {
   if (!raw) return raw;
+  // Already a 12-h string from the custom picker — pass through unchanged
+  if (/AM|PM/i.test(raw)) return raw.trim();
   const [hStr, mStr] = raw.split(":");
   const h = parseInt(hStr, 10);
   const min = parseInt(mStr ?? "0", 10);
@@ -196,10 +197,10 @@ function Step1Events({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Step 2 — Event details (date / time / venue)
+// Step 2 — Event details (date / custom-time / venue)
 // ─────────────────────────────────────────────────────────────
 
-/** Shared label style */
+/** Shared field label */
 function FieldLabel({ children }: { children: string }) {
   return (
     <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
@@ -209,35 +210,133 @@ function FieldLabel({ children }: { children: string }) {
   );
 }
 
-/** Native date / time input — light-mode panel, Champagne Gold accent, Royal Minimalist shell */
-function NativePicker({
-  type, value, onChange, id,
-}: { type: "date" | "time"; value: string; onChange: (v: string) => void; id: string }) {
+/** Shared inline style for <select> and plain text <input> */
+const FIELD_BASE: React.CSSProperties = {
+  border:          "1.5px solid var(--color-card-border)",
+  backgroundColor: "#FCFBF9",
+  color:           "#2D2B2A",
+  fontFamily:      "inherit",
+  fontSize:        "0.875rem",
+  outline:         "none",
+  borderRadius:    "0.5rem",
+  transition:      "border-color 0.18s, box-shadow 0.18s",
+};
+
+const FOCUS_ON  = (e: React.FocusEvent<HTMLElement>) => {
+  (e.currentTarget as HTMLElement).style.borderColor = "#D4AF37";
+  (e.currentTarget as HTMLElement).style.boxShadow   = "0 0 0 2.5px rgba(212,175,55,0.2)";
+};
+const FOCUS_OFF = (e: React.FocusEvent<HTMLElement>) => {
+  (e.currentTarget as HTMLElement).style.borderColor = "var(--color-card-border)";
+  (e.currentTarget as HTMLElement).style.boxShadow   = "none";
+};
+
+/** Native date picker — light-mode panel, Champagne Gold accent */
+function DatePicker({ value, onChange, id }: {
+  value: string; onChange: (v: string) => void; id: string;
+}) {
   return (
     <input
       id={id}
-      type={type}
+      type="date"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200 appearance-none accent-[#D4AF37]"
-      style={{
-        border:          "1.5px solid var(--color-card-border)",
-        backgroundColor: "#FCFBF9",
-        color:           value ? "#2D2B2A" : "var(--color-muted)",
-        fontFamily:      "inherit",
-        // Forces the browser-native calendar/clock panel into light mode
-        // so it doesn't inherit a dark OS theme and show a black background
-        colorScheme:     "light",
-      }}
-      onFocus={(e) => {
-        e.currentTarget.style.borderColor = "#D4AF37";
-        e.currentTarget.style.boxShadow   = "0 0 0 2.5px rgba(212,175,55,0.2)";
-      }}
-      onBlur={(e) => {
-        e.currentTarget.style.borderColor = "var(--color-card-border)";
-        e.currentTarget.style.boxShadow   = "none";
-      }}
+      className="w-full rounded-lg px-3 py-2.5 text-sm outline-none appearance-none accent-[#D4AF37]"
+      style={{ ...FIELD_BASE, colorScheme: "light", color: value ? "#2D2B2A" : "var(--color-muted)" }}
+      onFocus={FOCUS_ON}
+      onBlur={FOCUS_OFF}
     />
+  );
+}
+
+const HOURS   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+const MINUTES = ["00", "15", "30", "45"];
+
+/** Custom 12-hour time picker — three gold-accented select dropdowns */
+function CustomTimePicker({ value, onChange, id }: {
+  value: string; onChange: (v: string) => void; id: string;
+}) {
+  // Parse stored value ('07:30 PM') back into parts on mount / external reset
+  const parse = (v: string) => {
+    const m = v?.match(/^(\d{2}):(\d{2})\s?(AM|PM)$/i);
+    return m
+      ? { h: m[1], min: m[2], period: m[3].toUpperCase() as "AM" | "PM" }
+      : { h: "", min: "00", period: "AM" as const };
+  };
+
+  const init = parse(value);
+  const [h,      setH]      = useState(init.h);
+  const [min,    setMin]    = useState(init.min);
+  const [period, setPeriod] = useState<"AM" | "PM">(init.period);
+
+  // Sync when parent resets the wizard
+  useEffect(() => {
+    const p = parse(value);
+    setH(p.h); setMin(p.min); setPeriod(p.period);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const emit = (newH: string, newMin: string, newPeriod: string) => {
+    if (!newH) { onChange(""); return; }
+    onChange(`${newH}:${newMin} ${newPeriod}`);
+  };
+
+  const SELECT_STYLE: React.CSSProperties = {
+    ...FIELD_BASE,
+    padding:       "0.625rem 0.5rem",
+    cursor:        "pointer",
+    appearance:    "none" as const,
+    textAlign:     "center" as const,
+    // Remove default arrow; we rely on the text being short enough
+    backgroundImage: "none",
+  };
+
+  return (
+    <div id={id} className="flex items-center gap-1.5">
+      {/* Hours */}
+      <select
+        value={h}
+        onChange={(e) => { setH(e.target.value); emit(e.target.value, min, period); }}
+        className="flex-1 rounded-lg text-sm outline-none"
+        style={SELECT_STYLE}
+        onFocus={FOCUS_ON}
+        onBlur={FOCUS_OFF}
+        aria-label="Hour"
+      >
+        <option value="">HH</option>
+        {HOURS.map((hr) => <option key={hr} value={hr}>{hr}</option>)}
+      </select>
+
+      {/* Colon separator */}
+      <span className="font-bold text-sm select-none" style={{ color: "#D4AF37" }}>:</span>
+
+      {/* Minutes */}
+      <select
+        value={min}
+        onChange={(e) => { setMin(e.target.value); emit(h, e.target.value, period); }}
+        className="flex-1 rounded-lg text-sm outline-none"
+        style={SELECT_STYLE}
+        onFocus={FOCUS_ON}
+        onBlur={FOCUS_OFF}
+        aria-label="Minute"
+      >
+        {MINUTES.map((mn) => <option key={mn} value={mn}>{mn}</option>)}
+      </select>
+
+      {/* AM / PM */}
+      <select
+        value={period}
+        onChange={(e) => { const p = e.target.value as "AM" | "PM"; setPeriod(p); emit(h, min, p); }}
+        className="flex-1 rounded-lg text-sm outline-none"
+        style={SELECT_STYLE}
+        onFocus={FOCUS_ON}
+        onBlur={FOCUS_OFF}
+        aria-label="Period"
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
   );
 }
 
@@ -254,7 +353,7 @@ function Step2Details({
         Event Details
       </h3>
       <p className="text-sm mb-6" style={{ color: "var(--color-muted)" }}>
-        Pick a date &amp; time, then search for your venue — all fields are optional.
+        Add the date, time, and venue for each ceremony — all fields are optional.
       </p>
 
       <div className="space-y-5">
@@ -268,35 +367,39 @@ function Step2Details({
               <span>{EVENT_ICONS[ev]}</span> {ev}
             </p>
 
-            {/* Date + Time side by side */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <FieldLabel>Date</FieldLabel>
-                <NativePicker
-                  id={`date-${ev}`}
-                  type="date"
-                  value={details[ev].date}
-                  onChange={(v) => onChange(ev, "date", v)}
-                />
-              </div>
-              <div>
-                <FieldLabel>Time</FieldLabel>
-                <NativePicker
-                  id={`time-${ev}`}
-                  type="time"
-                  value={details[ev].time}
-                  onChange={(v) => onChange(ev, "time", v)}
-                />
-              </div>
+            {/* Date */}
+            <div className="mb-3">
+              <FieldLabel>Date</FieldLabel>
+              <DatePicker
+                id={`date-${ev}`}
+                value={details[ev].date}
+                onChange={(v) => onChange(ev, "date", v)}
+              />
             </div>
 
-            {/* Venue — full width, OSM Nominatim autocomplete */}
+            {/* Custom 12-h Time picker */}
+            <div className="mb-3">
+              <FieldLabel>Time</FieldLabel>
+              <CustomTimePicker
+                id={`time-${ev}`}
+                value={details[ev].time}
+                onChange={(v) => onChange(ev, "time", v)}
+              />
+            </div>
+
+            {/* Venue — plain styled text input */}
             <div>
               <FieldLabel>Venue</FieldLabel>
-              <VenueAutocomplete
-                eventId={ev}
+              <input
+                type="text"
+                id={`venue-${ev}`}
                 value={details[ev].venue}
-                onChange={(v) => onChange(ev, "venue", v)}
+                onChange={(e) => onChange(ev, "venue", e.target.value)}
+                placeholder="e.g. The Leela Palace, New Delhi"
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+                style={FIELD_BASE}
+                onFocus={FOCUS_ON}
+                onBlur={FOCUS_OFF}
               />
             </div>
           </div>
@@ -305,6 +408,7 @@ function Step2Details({
     </div>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // Step 3 — The Vibe
