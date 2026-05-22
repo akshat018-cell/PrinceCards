@@ -6,6 +6,8 @@ import type {
   EventName, VibeType, Relationship, PagePlacement,
   EventDetail, FamilyMember, SavedMatter,
 } from "@/context/MatterContext";
+import { GoogleMapsLoader } from "@/components/GoogleMapsLoader";
+import { VenueAutocomplete } from "@/components/VenueAutocomplete";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -39,6 +41,44 @@ const VIBE_INTRO: Record<VibeType, string> = {
 
 function generateUid() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Date / Time formatting utilities
+// ─────────────────────────────────────────────────────────────
+const ORDINAL = (n: number) => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+};
+
+/**
+ * Converts '2026-02-12' → 'February 12th, 2026'.
+ * Returns the original string unchanged if it isn't a valid ISO date.
+ */
+export function formatDate(raw: string): string {
+  if (!raw) return raw;
+  const [y, m, d] = raw.split("-").map(Number);
+  if (!y || !m || !d) return raw;
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt.getTime())) return raw;
+  const month = dt.toLocaleString("en-IN", { month: "long" });
+  return `${month} ${ORDINAL(d)}, ${y}`;
+}
+
+/**
+ * Converts '19:00' → '7:00 PM', '08:30' → '8:30 AM'.
+ * Returns the original string unchanged if it isn't a valid 24-h time.
+ */
+export function formatTime(raw: string): string {
+  if (!raw) return raw;
+  const [hStr, mStr] = raw.split(":");
+  const h = parseInt(hStr, 10);
+  const min = parseInt(mStr ?? "0", 10);
+  if (isNaN(h) || isNaN(min)) return raw;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(min).padStart(2, "0")} ${period}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -157,8 +197,50 @@ function Step1Events({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Step 2 — Event details
+// Step 2 — Event details (date / time / venue)
 // ─────────────────────────────────────────────────────────────
+
+/** Shared label style */
+function FieldLabel({ children }: { children: string }) {
+  return (
+    <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+      style={{ color: "var(--color-muted)" }}>
+      {children}
+    </label>
+  );
+}
+
+/** Native date / time input with Royal Minimalist styling */
+function NativePicker({
+  type, value, onChange, id,
+}: { type: "date" | "time"; value: string; onChange: (v: string) => void; id: string }) {
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200 appearance-none"
+        style={{
+          border:          "1.5px solid var(--color-card-border)",
+          backgroundColor: "var(--color-tag-bg)",
+          color:           value ? "var(--color-text)" : "var(--color-muted)",
+          fontFamily:      "inherit",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "var(--color-accent)";
+          e.currentTarget.style.boxShadow   = "0 0 0 2.5px rgba(212,175,55,0.18)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "var(--color-card-border)";
+          e.currentTarget.style.boxShadow   = "none";
+        }}
+      />
+    </div>
+  );
+}
+
 function Step2Details({
   events, details, onChange,
 }: {
@@ -172,36 +254,60 @@ function Step2Details({
         Event Details
       </h3>
       <p className="text-sm mb-6" style={{ color: "var(--color-muted)" }}>
-        Add the date, time, and venue for each selected event.
+        Pick a date &amp; time, then search for your venue — all fields are optional.
       </p>
-      <div className="space-y-6">
-        {events.map((ev) => (
-          <div key={ev} className="rounded-xl p-4" style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)" }}>
-            <p className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: "var(--color-accent-dark)" }}>
-              <span>{EVENT_ICONS[ev]}</span> {ev}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(["date", "time", "venue"] as (keyof EventDetail)[]).map((field) => (
-                <div key={field}>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>
-                    {field.charAt(0).toUpperCase() + field.slice(1)}
-                  </label>
-                  <input
-                    type="text"
-                    value={details[ev][field]}
-                    onChange={(e) => onChange(ev, field, e.target.value)}
-                    placeholder={field === "date" ? "e.g. Feb 12, 2026" : field === "time" ? "e.g. 7:00 PM" : "e.g. The Leela Palace"}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all duration-200"
-                    style={{ border: "1.5px solid var(--color-card-border)", backgroundColor: "var(--color-tag-bg)", color: "var(--color-text)" }}
-                    onFocus={(e) => (e.currentTarget.style.borderColor = "var(--color-accent)")}
-                    onBlur={(e) => (e.currentTarget.style.borderColor = "var(--color-card-border)")}
+
+      {/* Load Google Maps SDK once for all venue autocompletes on the page */}
+      <GoogleMapsLoader>
+        <div className="space-y-5">
+          {events.map((ev) => (
+            <div key={ev} className="rounded-xl p-4"
+              style={{ border: "1px solid var(--color-card-border)", backgroundColor: "var(--color-white)" }}>
+
+              {/* Event header */}
+              <p className="text-sm font-bold mb-4 flex items-center gap-2"
+                style={{ color: "var(--color-accent-dark)" }}>
+                <span>{EVENT_ICONS[ev]}</span> {ev}
+              </p>
+
+              {/* Date + Time side by side, Venue full-width below */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* Date */}
+                <div>
+                  <FieldLabel>Date</FieldLabel>
+                  <NativePicker
+                    id={`date-${ev}`}
+                    type="date"
+                    value={details[ev].date}
+                    onChange={(v) => onChange(ev, "date", v)}
                   />
                 </div>
-              ))}
+
+                {/* Time */}
+                <div>
+                  <FieldLabel>Time</FieldLabel>
+                  <NativePicker
+                    id={`time-${ev}`}
+                    type="time"
+                    value={details[ev].time}
+                    onChange={(v) => onChange(ev, "time", v)}
+                  />
+                </div>
+              </div>
+
+              {/* Venue — full width */}
+              <div>
+                <FieldLabel>Venue</FieldLabel>
+                <VenueAutocomplete
+                  eventId={ev}
+                  value={details[ev].venue}
+                  onChange={(v) => onChange(ev, "venue", v)}
+                />
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </GoogleMapsLoader>
     </div>
   );
 }
@@ -959,9 +1065,22 @@ export default function MatterWizard() {
     const groom = groomFamily.find((m) => m.relationship === "Parent")?.name
       ?? groomFamily[0]?.name ?? "Groom";
 
+    // Format raw HTML5 picker values into human-readable strings
+    // e.g. '2026-02-12' → 'February 12th, 2026'  |  '19:00' → '7:00 PM'
+    const formattedDetails = Object.fromEntries(
+      (Object.keys(eventDetails) as EventName[]).map((ev) => {
+        const d = eventDetails[ev];
+        return [ev, {
+          date:  formatDate(d.date),
+          time:  formatTime(d.time),
+          venue: d.venue,
+        }];
+      })
+    ) as Record<EventName, EventDetail>;
+
     const matter: SavedMatter = {
       bride, groom,
-      selectedEvents, eventDetails, vibe, brideFamily, groomFamily,
+      selectedEvents, eventDetails: formattedDetails, vibe, brideFamily, groomFamily,
     };
     saveMatter(matter);
 
@@ -972,7 +1091,7 @@ export default function MatterWizard() {
       const res = await fetch("/api/generate-wording", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vibe, selectedEvents, eventDetails, brideFamily, groomFamily }),
+        body: JSON.stringify({ vibe, selectedEvents, eventDetails: formattedDetails, brideFamily, groomFamily }),
       });
       const data = await res.json();
       if (res.ok && data.wording) {
