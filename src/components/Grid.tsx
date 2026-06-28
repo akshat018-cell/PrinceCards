@@ -33,7 +33,7 @@ export default function Grid({ items, onCardClick }: GridProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Reset to page 1 whenever the item list changes (filter / tab change)
+  // Reset to page 1 whenever the item list changes (filter/tab change)
   useEffect(() => { setCurrentPage(1); }, [items]);
 
   const totalPages   = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
