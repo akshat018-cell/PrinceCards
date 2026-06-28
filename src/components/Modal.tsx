@@ -68,7 +68,7 @@ export default function Modal({ item, onClose, onNavigateToMatter }: ModalProps)
 
   if (!item) return null;
 
-  // ── WhatsApp Enquire Now (only visible after PDF downloaded) ──
+  // ── WhatsApp Enquire Now (only visible after PDF is downloaded) ──
   const handleEnquireNow = () => {
     const productLink = typeof window !== "undefined" ? window.location.href : "https://princecards.in";
     const matter = savedMatter;
