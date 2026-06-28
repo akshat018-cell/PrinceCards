@@ -573,7 +573,7 @@ function Step4Family({
   onGroomUpdate:      (id: string, field: keyof Omit<FamilyMember, "id">, val: string) => void;
   onGroomRemove:      (id: string) => void;
 }) {
-  /** Shared inline-focus handler for couple name inputs */
+  /** Shared inline-focus handler for couple name inputs  */
   const goldFocus   = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.style.borderColor = "#D4AF37";
     e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(212,175,55,0.18)";
